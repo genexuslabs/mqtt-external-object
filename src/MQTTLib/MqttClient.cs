@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -6,12 +7,13 @@ using System.Text;
 using MQTTnet;
 using MQTTnet.Client;
 using MQTTnet.Client.Options;
+using MQTTnet.Client.Subscribing;
 
 namespace MQTTLib
 {
     public class MqttClient
     {
-        IMqttClient m_mqttClient;
+        readonly IMqttClient m_mqttClient;
         public MqttClient(IMqttClient mqttClient)
         {
             m_mqttClient = mqttClient;
@@ -24,20 +26,35 @@ namespace MQTTLib
             MqttFactory factory = new MqttFactory();
             IMqttClient client = factory.CreateMqttClient();
 
-
-            var b = new MqttClientOptionsBuilder();
-            var options = b.WithTcpServer(url, config.Port)
+            var b = new MqttClientOptionsBuilder()
+                .WithTcpServer(url, config.Port)
                 .WithClientId(config.ClientId)
                 .WithKeepAlivePeriod(TimeSpan.FromSeconds(config.KeepAlive))
                 .WithMaximumPacketSize(Convert.ToUInt32(config.BufferSize))
-                .WithCommunicationTimeout(TimeSpan.FromMilliseconds(config.ConnectionTimeout))
-                .WithCredentials(config.UserName, config.Password)
-                .Build();
+                .WithCommunicationTimeout(TimeSpan.FromSeconds(config.WaitTimeout))
+                .WithCredentials(config.UserName, config.Password);
+
 
             //if (config.SSLConnection)
-            //    b = b.WithTls();
+            //{
+            //    var tls = new MqttClientOptionsBuilderTlsParameters
+            //    {
+            //        UseTls = true,
+            //        AllowUntrustedCertificates = true,
 
-            //options = b.Build();
+            //        byte[] buffer = Convert.FromBase64String(config.)
+
+            //        Certificates = new List<byte[]> { new X509Certificate2(caCert).Export(X509ContentType.Cert) },
+            //        CertificateValidationCallback = delegate { return true; },
+            //        IgnoreCertificateChainErrors = false,
+            //        IgnoreCertificateRevocationErrors = false
+            //    };
+
+
+            //    b = b.WithTls(tls);
+            //}
+
+            IMqttClientOptions options = b.Build();
 
             client.ConnectAsync(options).Wait();
 
