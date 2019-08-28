@@ -7,7 +7,6 @@ using System.Text;
 using MQTTnet;
 using MQTTnet.Client;
 using MQTTnet.Client.Options;
-using MQTTnet.Client.Subscribing;
 
 namespace MQTTLib
 {
@@ -34,32 +33,52 @@ namespace MQTTLib
                 .WithCommunicationTimeout(TimeSpan.FromSeconds(config.WaitTimeout))
                 .WithCredentials(config.UserName, config.Password);
 
+            if (config.SSLConnection)
+            {
+                byte[] buffer = Convert.FromBase64String(config.CertificateKey);
 
-            //if (config.SSLConnection)
-            //{
-            //    var tls = new MqttClientOptionsBuilderTlsParameters
-            //    {
-            //        UseTls = true,
-            //        AllowUntrustedCertificates = true,
+                var tls = new MqttClientOptionsBuilderTlsParameters
+                {
+                    UseTls = true,
+                    //AllowUntrustedCertificates = true,
+                    Certificates = new List<byte[]> { buffer },
+                    CertificateValidationCallback = (certificate, chain, sslError, opts) =>
+                    {
+                        if (sslError != System.Net.Security.SslPolicyErrors.None)
+                            return false;
 
-            //        byte[] buffer = Convert.FromBase64String(config.)
+                        if (!ByteArrayCompare(certificate.GetRawCertData(), opts.ChannelOptions.TlsOptions.Certificates[0]))
+                            return false;
 
-            //        Certificates = new List<byte[]> { new X509Certificate2(caCert).Export(X509ContentType.Cert) },
-            //        CertificateValidationCallback = delegate { return true; },
-            //        IgnoreCertificateChainErrors = false,
-            //        IgnoreCertificateRevocationErrors = false
-            //    };
+                        foreach (var chainElement in chain.ChainElements)
+                        {
+                            if (!chainElement.Certificate.Verify())
+                                return false;
+                        }
+
+                        //CAAuthorityKey validation missing
+                        //PrivateKey validation missing
+                        //ClientKeyPassphrase validation missing
+                        
+                        return true;
+                    }
+                    //IgnoreCertificateChainErrors = false,
+                    //IgnoreCertificateRevocationErrors = false
+                };
 
 
-            //    b = b.WithTls(tls);
-            //}
 
-            IMqttClientOptions options = b.Build();
+                b = b.WithTls(tls);
+            }
 
-            client.ConnectAsync(options).Wait();
-
+            client.ConnectAsync(b.Build()).Wait();
 
             return new MqttClient(client);
+        }
+
+        static bool ByteArrayCompare(ReadOnlySpan<byte> a1, ReadOnlySpan<byte> a2)
+        {
+            return a1.SequenceEqual(a2);
         }
 
         public void Disconnect()
@@ -76,6 +95,9 @@ namespace MQTTLib
             var a = m_mqttClient.SubscribeAsync(topic).Result;
             m_mqttClient.UseApplicationMessageReceivedHandler(msg =>
             {
+                if (msg == null || msg.ApplicationMessage == null || msg.ApplicationMessage.Payload == null)
+                    return;
+
                 Console.WriteLine($"Message arrived! Topic:{msg.ApplicationMessage.Topic} Payload:{Encoding.UTF8.GetString(msg.ApplicationMessage.Payload)}");
 
                 string dllFile = $"a{gxproc}.dll";

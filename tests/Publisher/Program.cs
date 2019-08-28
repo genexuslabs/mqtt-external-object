@@ -9,7 +9,7 @@ namespace Publisher
         {
             try
             {
-                MQTTLib.MqttClient client = Common.CommonConnection.Connect();
+                MQTTLib.MqttClient client = Common.CommonConnection.ConnectTLS();
 
                 string topic = ConfigurationManager.AppSettings["topic"];
 
@@ -18,7 +18,7 @@ namespace Publisher
                 string command = Console.ReadLine();
                 while (command != "exit")
                 {
-                    client.Publish(topic, command, 0, true);
+                    client.Publish(topic, command, 2, true);
                     command = Console.ReadLine();
                 }
 

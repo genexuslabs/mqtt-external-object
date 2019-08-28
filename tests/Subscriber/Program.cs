@@ -9,11 +9,11 @@ namespace Subscriber
         {
             try
             {
-                MQTTLib.MqttClient client = Common.CommonConnection.Connect();
+                MQTTLib.MqttClient client = Common.CommonConnection.ConnectTLS();
 
                 string topic = ConfigurationManager.AppSettings["topic"];
 
-                client.Subscribe(topic, "SaveMessage", 0);
+                client.Subscribe(topic, "SaveMessage", 2);
 
                 Console.WriteLine($"Subscribed to topic:{topic}");
                 Console.WriteLine($"Press <enter> to exit...");
