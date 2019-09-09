@@ -92,6 +92,10 @@ namespace MQTTLib
             if (string.IsNullOrEmpty(gxproc))
                 throw new ArgumentNullException(nameof(gxproc), "GeneXus procedure parameter cannot be null");
 
+            string dllFile = $"a{gxproc}.dll";
+            if (!File.Exists(dllFile))
+                throw new FileNotFoundException($"File {dllFile} not found.", dllFile);
+
             var a = m_mqttClient.SubscribeAsync(topic).Result;
             m_mqttClient.UseApplicationMessageReceivedHandler(msg =>
             {
@@ -100,7 +104,7 @@ namespace MQTTLib
 
                 Console.WriteLine($"Message arrived! Topic:{msg.ApplicationMessage.Topic} Payload:{Encoding.UTF8.GetString(msg.ApplicationMessage.Payload)}");
 
-                string dllFile = $"a{gxproc}.dll";
+                dllFile = $"a{gxproc}.dll";
                 if (!File.Exists(dllFile))
                     throw new FileNotFoundException($"File {dllFile} not found.", dllFile);
 

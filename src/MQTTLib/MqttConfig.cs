@@ -1,4 +1,8 @@
-﻿namespace MQTTLib
+﻿using System.IO;
+using System.Runtime.Serialization.Json;
+using System.Text;
+
+namespace MQTTLib
 {
     public class MqttConfig
     {
@@ -13,7 +17,6 @@
         public string MQTTConnectionName { get; set; } = "mqtt_connection1";
         public string ClientId { get; set; }
         public bool SSLConnection { get; set; }
-
         public string CAcertificateKey { get; set; }
         public string CertificateKey { get; set; }
         public string PrivateKey { get; set; }
@@ -23,6 +26,18 @@
         public static MqttConfig Default
         {
             get { return new MqttConfig(); }
+        }
+
+        public string ExportMqttConfig()
+        {
+            byte[] json;
+            using (var ms = new MemoryStream())
+            {
+                var ser = new DataContractJsonSerializer(typeof(MqttConfig));
+                ser.WriteObject(ms, this);
+                json = ms.ToArray();
+            }
+            return Encoding.UTF8.GetString(json);
         }
     }
 }
