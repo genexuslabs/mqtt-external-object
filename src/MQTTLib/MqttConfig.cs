@@ -39,5 +39,17 @@ namespace MQTTLib
             }
             return Encoding.UTF8.GetString(json);
         }
+
+        public static MqttConfig ImportMqttConfig(string json)
+        {
+            var config = new MqttConfig();
+            using (var ms = new MemoryStream(Encoding.UTF8.GetBytes(json)))
+            {
+                var ser = new DataContractJsonSerializer(typeof(MqttConfig));
+                config = ser.ReadObject(ms) as MqttConfig;
+            }
+
+            return config;
+        }
     }
 }
