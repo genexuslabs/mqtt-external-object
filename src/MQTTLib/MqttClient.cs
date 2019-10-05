@@ -12,6 +12,7 @@ namespace MQTTLib
 {
     public class MqttClient
     {
+		static Dictionary<Guid, MqttClient> s_instances = new Dictionary<Guid, MqttClient>();
         readonly IMqttClient m_mqttClient;
         public MqttClient(IMqttClient mqttClient)
         {
@@ -20,7 +21,7 @@ namespace MQTTLib
 
         public MqttClient() { }
 
-        public static MqttClient Connect(string url, MqttConfig config)
+        public static Guid Connect(string url, MqttConfig config)
         {
             MqttFactory factory = new MqttFactory();
             IMqttClient client = factory.CreateMqttClient();
@@ -73,7 +74,12 @@ namespace MQTTLib
 
             client.ConnectAsync(b.Build()).Wait();
 
-            return new MqttClient(client);
+			MqttClient mqtt = new MqttClient(client);
+			Guid key = Guid.NewGuid();
+
+			s_instances[key] = mqtt;
+
+			return key;
         }
 
         static bool ByteArrayCompare(ReadOnlySpan<byte> a1, ReadOnlySpan<byte> a2)
@@ -81,23 +87,25 @@ namespace MQTTLib
             return a1.SequenceEqual(a2);
         }
 
-        public void Disconnect()
+        public static void Disconnect(Guid key)
         {
-            m_mqttClient.DisconnectAsync().Wait();
-            m_mqttClient.Dispose();
+			MqttClient mqtt = GetClient(key);
+			mqtt.m_mqttClient.DisconnectAsync().Wait();
+            mqtt.m_mqttClient.Dispose();
         }
 
-        public void Subscribe(string topic, string gxproc, int qos)
+        public static void Subscribe(Guid key, string topic, string gxproc, int qos)
         {
-            if (string.IsNullOrEmpty(gxproc))
+			if (string.IsNullOrEmpty(gxproc))
                 throw new ArgumentNullException(nameof(gxproc), "GeneXus procedure parameter cannot be null");
 
             string dllFile = $"a{gxproc}.dll";
             if (!File.Exists(dllFile))
                 throw new FileNotFoundException($"File {dllFile} not found.", dllFile);
 
-            var a = m_mqttClient.SubscribeAsync(topic).Result;
-            m_mqttClient.UseApplicationMessageReceivedHandler(msg =>
+			MqttClient mqtt = GetClient(key);
+			var a = mqtt.m_mqttClient.SubscribeAsync(topic).Result;
+			mqtt.m_mqttClient.UseApplicationMessageReceivedHandler(msg =>
             {
                 if (msg == null || msg.ApplicationMessage == null || msg.ApplicationMessage.Payload == null)
                     return;
@@ -125,9 +133,21 @@ namespace MQTTLib
             });
         }
 
-        public void Publish(string topic, string payload, int qos, bool retainMessage)
+        public static void Publish(Guid key, string topic, string payload, int qos, bool retainMessage)
         {
-            m_mqttClient.PublishAsync(topic, payload, (MQTTnet.Protocol.MqttQualityOfServiceLevel)Enum.ToObject(typeof(MQTTnet.Protocol.MqttQualityOfServiceLevel), qos), retainMessage).Wait();
+			MqttClient mqtt = GetClient(key);
+			mqtt.m_mqttClient.PublishAsync(topic, payload, (MQTTnet.Protocol.MqttQualityOfServiceLevel)Enum.ToObject(typeof(MQTTnet.Protocol.MqttQualityOfServiceLevel), qos), retainMessage).Wait();
         }
+
+		static MqttClient GetClient(Guid key)
+		{
+			if (string.IsNullOrEmpty(key.ToString()))
+				throw new ArgumentNullException(nameof(key), "The key cannot be null");
+
+			if (!s_instances.ContainsKey(key))
+				throw new ArgumentOutOfRangeException(nameof(key), "Connection is not open.");
+
+			return s_instances[key];
+		}
     }
 }

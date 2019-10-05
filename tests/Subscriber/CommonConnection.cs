@@ -6,7 +6,7 @@ namespace Common
 {
     internal class CommonConnection
     {
-        public static MQTTLib.MqttClient ConnectTLS()
+        public static Guid ConnectTLS()
         {
             MqttConfig config = GetConfig();
 
@@ -56,22 +56,22 @@ Ht7LDqFUSy2ZL4yTyCqEnA==";
             return Connect(config);
         }
 
-        public static MQTTLib.MqttClient Connect()
+        public static Guid Connect()
         {
             MqttConfig config = GetConfig();
 
             return Connect(config);
         }
 
-        static MQTTLib.MqttClient Connect(MqttConfig config)
+        static Guid Connect(MqttConfig config)
         {
             string url = ConfigurationManager.AppSettings["url"];
 
-            MQTTLib.MqttClient client = MQTTLib.MqttClient.Connect(url, config);
+            Guid key = MQTTLib.MqttClient.Connect(url, config);
 
             Console.WriteLine("Connected!");
 
-            return client;
+            return key;
         }
 
         public static MqttConfig GetConfig()

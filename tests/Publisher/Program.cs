@@ -1,4 +1,5 @@
-﻿using System;
+﻿using MQTTLib;
+using System;
 using System.Configuration;
 
 namespace Publisher
@@ -9,7 +10,7 @@ namespace Publisher
         {
             try
             {
-                MQTTLib.MqttClient client = Common.CommonConnection.ConnectTLS();
+                Guid key = Common.CommonConnection.Connect();
 
                 string topic = ConfigurationManager.AppSettings["topic"];
 
@@ -18,7 +19,7 @@ namespace Publisher
                 string command = Console.ReadLine();
                 while (command != "exit")
                 {
-                    client.Publish(topic, command, 2, true);
+                    MqttClient.Publish(key, topic, command, 2, false);
                     command = Console.ReadLine();
                 }
 
