@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿using MQTTnet.Formatter;
+using System.IO;
 using System.Runtime.Serialization.Json;
 using System.Text;
 
@@ -21,9 +22,10 @@ namespace MQTTLib
         public string CertificateKey { get; set; }
         public string PrivateKey { get; set; }
         public string ClientKeyPassphrase { get; set; }
+		public int ProtocolVersion { get; set; } = 500;
 
 
-        public static MqttConfig Default
+		public static MqttConfig Default
         {
             get { return new MqttConfig(); }
         }

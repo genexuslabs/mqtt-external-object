@@ -7,6 +7,7 @@ using System.Text;
 using MQTTnet;
 using MQTTnet.Client;
 using MQTTnet.Client.Options;
+using MQTTnet.Formatter;
 
 namespace MQTTLib
 {
@@ -26,15 +27,30 @@ namespace MQTTLib
             MqttFactory factory = new MqttFactory();
             IMqttClient client = factory.CreateMqttClient();
 
-            var b = new MqttClientOptionsBuilder()
-                .WithTcpServer(url, config.Port)
-                .WithClientId(config.ClientId)
-                .WithKeepAlivePeriod(TimeSpan.FromSeconds(config.KeepAlive))
-                .WithMaximumPacketSize(Convert.ToUInt32(config.BufferSize))
-                .WithCommunicationTimeout(TimeSpan.FromSeconds(config.WaitTimeout))
-                .WithCredentials(config.UserName, config.Password);
+			var b = new MqttClientOptionsBuilder()
+				.WithTcpServer(url, config.Port)
+				.WithClientId(config.ClientId)
+				.WithKeepAlivePeriod(TimeSpan.FromSeconds(config.KeepAlive))
+				.WithMaximumPacketSize(Convert.ToUInt32(config.BufferSize))
+				.WithCommunicationTimeout(TimeSpan.FromSeconds(config.WaitTimeout))
+				.WithCredentials(config.UserName, config.Password);
 
-            if (config.SSLConnection)
+			switch (config.ProtocolVersion)
+			{
+				case 310:
+					b = b.WithProtocolVersion(MqttProtocolVersion.V310);
+					break;
+				case 311:
+					b = b.WithProtocolVersion(MqttProtocolVersion.V311);
+					break;
+				case 500:
+					b = b.WithProtocolVersion(MqttProtocolVersion.V500);
+					break;
+				default:
+					throw new InvalidDataException("Invalis protocol versions. Valid versions are 310, 311 or 500");
+			}
+
+			if (config.SSLConnection)
             {
                 byte[] buffer = Convert.FromBase64String(config.CertificateKey);
 
@@ -130,7 +146,13 @@ namespace MQTTLib
             });
         }
 
-        public static void Publish(Guid key, string topic, string payload, int qos, bool retainMessage)
+		public static void Unsubscribe(Guid key, string topic)
+		{
+			MqttClient mqtt = GetClient(key);
+			mqtt.m_mqttClient.UnsubscribeAsync(topic).Wait();
+		}
+
+		public static void Publish(Guid key, string topic, string payload, int qos, bool retainMessage)
         {
 			MqttClient mqtt = GetClient(key);
 			mqtt.m_mqttClient.PublishAsync(topic, payload, (MQTTnet.Protocol.MqttQualityOfServiceLevel)Enum.ToObject(typeof(MQTTnet.Protocol.MqttQualityOfServiceLevel), qos), retainMessage).Wait();
