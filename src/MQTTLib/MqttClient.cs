@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using MQTTnet;
 using MQTTnet.Client;
@@ -13,7 +14,7 @@ namespace MQTTLib
 {
     public class MqttClient
     {
-		static Dictionary<Guid, MqttClient> s_instances = new Dictionary<Guid, MqttClient>();
+        static Dictionary<Guid, MqttClient> s_instances = new Dictionary<Guid, MqttClient>();
         readonly IMqttClient m_mqttClient;
         public MqttClient(IMqttClient mqttClient)
         {
@@ -24,78 +25,75 @@ namespace MQTTLib
 
         public static Guid Connect(string url, MqttConfig config)
         {
-            MqttFactory factory = new MqttFactory();
-            IMqttClient client = factory.CreateMqttClient();
+            IMqttClient client = new MqttFactory().CreateMqttClient();
 
-			var b = new MqttClientOptionsBuilder()
-				.WithTcpServer(url, config.Port)
-				.WithClientId(config.ClientId)
-				.WithKeepAlivePeriod(TimeSpan.FromSeconds(config.KeepAlive))
-				.WithMaximumPacketSize(Convert.ToUInt32(config.BufferSize))
-				.WithCommunicationTimeout(TimeSpan.FromSeconds(config.WaitTimeout))
-				.WithCredentials(config.UserName, config.Password);
+            var b = new MqttClientOptionsBuilder()
+                .WithTcpServer(url, config.Port)
+                .WithClientId(config.ClientId)
+                .WithKeepAlivePeriod(TimeSpan.FromSeconds(config.KeepAlive))
+                .WithMaximumPacketSize(Convert.ToUInt32(config.BufferSize))
+                .WithCommunicationTimeout(TimeSpan.FromSeconds(config.WaitTimeout));
 
-			switch (config.ProtocolVersion)
-			{
-				case 310:
-					b = b.WithProtocolVersion(MqttProtocolVersion.V310);
-					break;
-				case 311:
-					b = b.WithProtocolVersion(MqttProtocolVersion.V311);
-					break;
-				case 500:
-					b = b.WithProtocolVersion(MqttProtocolVersion.V500);
-					break;
-				default:
-					throw new InvalidDataException("Invalis protocol versions. Valid versions are 310, 311 or 500");
-			}
+            if (!string.IsNullOrEmpty(config.UserName) && !string.IsNullOrEmpty(config.Password))
+                b = b.WithCredentials(config.UserName, config.Password);
 
-			if (config.SSLConnection)
+            switch (config.ProtocolVersion)
             {
-                byte[] buffer = Convert.FromBase64String(config.CertificateKey);
+                case 310:
+                    b = b.WithProtocolVersion(MqttProtocolVersion.V310);
+                    break;
+                case 311:
+                    b = b.WithProtocolVersion(MqttProtocolVersion.V311);
+                    break;
+                case 500:
+                    b = b.WithProtocolVersion(MqttProtocolVersion.V500);
+                    break;
+                default:
+                    throw new InvalidDataException("Invalid protocol versions. Valid versions are 310, 311 or 500");
+            }
 
-                var tls = new MqttClientOptionsBuilderTlsParameters
+
+            if (config.SSLConnection)
+            {
+                byte[] caBytes = Convert.FromBase64String(config.CAcertificateKey);
+
+                X509Certificate cliCert = new X509Certificate(config.ClientCertificatePath, config.ClientCerificatePassphrase);
+                byte[] cliBytes = cliCert.Export(X509ContentType.Cert);
+
+                try
                 {
-                    UseTls = true,
-                    //AllowUntrustedCertificates = true,
-                    Certificates = new List<byte[]> { buffer },
-                    CertificateValidationCallback = (certificate, chain, sslError, opts) =>
+                    var tls = new MqttClientOptionsBuilderTlsParameters
                     {
-                        if (sslError != System.Net.Security.SslPolicyErrors.None)
-                            return false;
+                        SslProtocol = System.Security.Authentication.SslProtocols.Tls12 | System.Security.Authentication.SslProtocols.Tls11 | System.Security.Authentication.SslProtocols.Tls,
+                        UseTls = true,
+                        AllowUntrustedCertificates = true,
+                        IgnoreCertificateChainErrors = true,
+                        IgnoreCertificateRevocationErrors = true,
 
-                        if (!ByteArrayCompare(certificate.GetRawCertData(), opts.ChannelOptions.TlsOptions.Certificates[0]))
-                            return false;
+                        Certificates = new List<byte[]>() { caBytes, cliBytes },
 
-                        foreach (var chainElement in chain.ChainElements)
-                        {
-                            if (!chainElement.Certificate.Verify())
-                                return false;
-                        }
+                        CertificateValidationCallback = (certificate, chain, sslError, opts) => true
 
-                        //CAAuthorityKey validation missing
-                        //PrivateKey validation missing
-                        //ClientKeyPassphrase validation missing
-                        
-                        return true;
-                    }
-                    //IgnoreCertificateChainErrors = false,
-                    //IgnoreCertificateRevocationErrors = false
-                };
+                    };
 
+                    b = b.WithTls(tls);
 
-
-                b = b.WithTls(tls);
+                }
+                finally
+                {
+                    cliCert.Dispose();
+                }
             }
 
             client.ConnectAsync(b.Build()).Wait();
 
-			MqttClient mqtt = new MqttClient(client);
-			Guid key = Guid.NewGuid();
+            MqttClient mqtt = new MqttClient(client);
 
-			s_instances[key] = mqtt;
+            Guid key = Guid.NewGuid();
 
-			return key;
+            s_instances[key] = mqtt;
+
+            return key;
         }
 
         static bool ByteArrayCompare(ReadOnlySpan<byte> a1, ReadOnlySpan<byte> a2)
@@ -105,24 +103,25 @@ namespace MQTTLib
 
         public static void Disconnect(Guid key)
         {
-			MqttClient mqtt = GetClient(key);
-			mqtt.m_mqttClient.DisconnectAsync().Wait();
+            MqttClient mqtt = GetClient(key);
+            mqtt.m_mqttClient.DisconnectAsync().Wait();
             mqtt.m_mqttClient.Dispose();
         }
 
         public static void Subscribe(Guid key, string topic, string gxproc, int qos)
         {
-			if (string.IsNullOrEmpty(gxproc))
+            if (string.IsNullOrEmpty(gxproc))
                 throw new ArgumentNullException(nameof(gxproc), "GeneXus procedure parameter cannot be null");
 
-			string fileName = $"a{gxproc}.dll";
-            string fullPath = Path.Combine(AppDomain.CurrentDomain.RelativeSearchPath, fileName);
-			if (!File.Exists(fullPath))
+            string fileName = $"a{gxproc}.dll";
+            string baseDir = !string.IsNullOrEmpty(AppDomain.CurrentDomain.RelativeSearchPath) ? AppDomain.CurrentDomain.RelativeSearchPath : AppDomain.CurrentDomain.BaseDirectory;
+            string fullPath = Path.Combine(baseDir, fileName);
+            if (!File.Exists(fullPath))
                 throw new FileNotFoundException($"File not found at {fullPath}", fileName);
 
-			MqttClient mqtt = GetClient(key);
-			var a = mqtt.m_mqttClient.SubscribeAsync(topic).Result;
-			mqtt.m_mqttClient.UseApplicationMessageReceivedHandler(msg =>
+            MqttClient mqtt = GetClient(key);
+            var a = mqtt.m_mqttClient.SubscribeAsync(topic).Result;
+            mqtt.m_mqttClient.UseApplicationMessageReceivedHandler(msg =>
             {
                 if (msg == null || msg.ApplicationMessage == null || msg.ApplicationMessage.Payload == null)
                     return;
@@ -146,27 +145,27 @@ namespace MQTTLib
             });
         }
 
-		public static void Unsubscribe(Guid key, string topic)
-		{
-			MqttClient mqtt = GetClient(key);
-			mqtt.m_mqttClient.UnsubscribeAsync(topic).Wait();
-		}
-
-		public static void Publish(Guid key, string topic, string payload, int qos, bool retainMessage)
+        public static void Unsubscribe(Guid key, string topic)
         {
-			MqttClient mqtt = GetClient(key);
-			mqtt.m_mqttClient.PublishAsync(topic, payload, (MQTTnet.Protocol.MqttQualityOfServiceLevel)Enum.ToObject(typeof(MQTTnet.Protocol.MqttQualityOfServiceLevel), qos), retainMessage).Wait();
+            MqttClient mqtt = GetClient(key);
+            mqtt.m_mqttClient.UnsubscribeAsync(topic).Wait();
         }
 
-		static MqttClient GetClient(Guid key)
-		{
-			if (string.IsNullOrEmpty(key.ToString()))
-				throw new ArgumentNullException(nameof(key), "The key cannot be null");
+        public static void Publish(Guid key, string topic, string payload, int qos, bool retainMessage)
+        {
+            MqttClient mqtt = GetClient(key);
+            mqtt.m_mqttClient.PublishAsync(topic, payload, (MQTTnet.Protocol.MqttQualityOfServiceLevel)Enum.ToObject(typeof(MQTTnet.Protocol.MqttQualityOfServiceLevel), qos), retainMessage).Wait();
+        }
 
-			if (!s_instances.ContainsKey(key))
-				throw new ArgumentOutOfRangeException(nameof(key), "Connection is not open.");
+        static MqttClient GetClient(Guid key)
+        {
+            if (string.IsNullOrEmpty(key.ToString()))
+                throw new ArgumentNullException(nameof(key), "The key cannot be null");
 
-			return s_instances[key];
-		}
+            if (!s_instances.ContainsKey(key))
+                throw new ArgumentOutOfRangeException(nameof(key), "Connection is not open.");
+
+            return s_instances[key];
+        }
     }
 }
