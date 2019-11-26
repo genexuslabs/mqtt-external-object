@@ -55,7 +55,8 @@ namespace MQTTLib
 
             if (config.SSLConnection)
             {
-                byte[] caBytes = Convert.FromBase64String(config.CAcertificateKey);
+                X509Certificate caCert = new X509Certificate(config.CAcertificatePath);
+                byte[] caBytes = caCert.Export(X509ContentType.Cert);
 
                 X509Certificate cliCert = new X509Certificate(config.ClientCertificatePath, config.ClientCerificatePassphrase);
                 byte[] cliBytes = cliCert.Export(X509ContentType.Cert);
@@ -81,6 +82,7 @@ namespace MQTTLib
                 }
                 finally
                 {
+                    caCert.Dispose();
                     cliCert.Dispose();
                 }
             }
@@ -94,11 +96,6 @@ namespace MQTTLib
             s_instances[key] = mqtt;
 
             return key;
-        }
-
-        static bool ByteArrayCompare(ReadOnlySpan<byte> a1, ReadOnlySpan<byte> a2)
-        {
-            return a1.SequenceEqual(a2);
         }
 
         public static void Disconnect(Guid key)

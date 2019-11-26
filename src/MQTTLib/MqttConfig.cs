@@ -18,9 +18,9 @@ namespace MQTTLib
         public string MQTTConnectionName { get; set; } = "mqtt_connection1";
         public string ClientId { get; set; }
         public bool SSLConnection { get; set; }
-        public string CAcertificateKey { get; set; }
+        public string CAcertificatePath { get; set; }
         public string ClientCertificatePath { get; set; }
-        public string PrivateKey { get; set; }
+        //public string PrivateKey { get; set; }
         public string ClientCerificatePassphrase { get; set; }
 		public int ProtocolVersion { get; set; } = 500;
 
