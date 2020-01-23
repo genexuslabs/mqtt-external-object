@@ -12,157 +12,157 @@ using MQTTnet.Formatter;
 
 namespace MQTTLib
 {
-    public class MqttClient
-    {
-        static Dictionary<Guid, MqttClient> s_instances = new Dictionary<Guid, MqttClient>();
-        readonly IMqttClient m_mqttClient;
-        public MqttClient(IMqttClient mqttClient)
-        {
-            m_mqttClient = mqttClient;
-        }
+	public class MqttClient
+	{
+		static Dictionary<Guid, MqttClient> s_instances = new Dictionary<Guid, MqttClient>();
+		readonly IMqttClient m_mqttClient;
+		public MqttClient(IMqttClient mqttClient)
+		{
+			m_mqttClient = mqttClient;
+		}
 
-        public MqttClient() { }
+		public MqttClient() { }
 
-        public static Guid Connect(string url, MqttConfig config)
-        {
-            IMqttClient client = new MqttFactory().CreateMqttClient();
+		public static Guid Connect(string url, MqttConfig config)
+		{
+			IMqttClient client = new MqttFactory().CreateMqttClient();
 
-            var b = new MqttClientOptionsBuilder()
-                .WithTcpServer(url, config.Port)
-                .WithClientId(config.ClientId)
-                .WithKeepAlivePeriod(TimeSpan.FromSeconds(config.KeepAlive))
-                .WithMaximumPacketSize(Convert.ToUInt32(config.BufferSize))
-                .WithCommunicationTimeout(TimeSpan.FromSeconds(config.WaitTimeout));
+			var b = new MqttClientOptionsBuilder()
+				.WithTcpServer(url, config.Port)
+				.WithClientId(config.ClientId)
+				.WithKeepAlivePeriod(TimeSpan.FromSeconds(config.KeepAlive))
+				.WithMaximumPacketSize(Convert.ToUInt32(config.BufferSize))
+				.WithCommunicationTimeout(TimeSpan.FromSeconds(config.WaitTimeout));
 
-            if (!string.IsNullOrEmpty(config.UserName) && !string.IsNullOrEmpty(config.Password))
-                b = b.WithCredentials(config.UserName, config.Password);
+			if (!config.SSLConnection && !string.IsNullOrEmpty(config.UserName) && !string.IsNullOrEmpty(config.Password))
+				b = b.WithCredentials(config.UserName, config.Password);
 
-            switch (config.ProtocolVersion)
-            {
-                case 310:
-                    b = b.WithProtocolVersion(MqttProtocolVersion.V310);
-                    break;
-                case 311:
-                    b = b.WithProtocolVersion(MqttProtocolVersion.V311);
-                    break;
-                case 500:
-                    b = b.WithProtocolVersion(MqttProtocolVersion.V500);
-                    break;
-                default:
-                    throw new InvalidDataException("Invalid protocol versions. Valid versions are 310, 311 or 500");
-            }
+			switch (config.ProtocolVersion)
+			{
+				case 310:
+					b = b.WithProtocolVersion(MqttProtocolVersion.V310);
+					break;
+				case 311:
+					b = b.WithProtocolVersion(MqttProtocolVersion.V311);
+					break;
+				case 500:
+					b = b.WithProtocolVersion(MqttProtocolVersion.V500);
+					break;
+				default:
+					throw new InvalidDataException("Invalid protocol versions. Valid versions are 310, 311 or 500");
+			}
 
 
-            if (config.SSLConnection)
-            {
-                X509Certificate caCert = new X509Certificate(config.CAcertificatePath);
-                byte[] caBytes = caCert.Export(X509ContentType.Cert);
+			if (config.SSLConnection)
+			{
+				X509Certificate caCert = new X509Certificate(Convert.FromBase64String(config.CAcertificate));
+				byte[] caBytes = caCert.Export(X509ContentType.Cert);
 
-                X509Certificate cliCert = new X509Certificate(config.ClientCertificatePath, config.ClientCerificatePassphrase);
-                byte[] cliBytes = cliCert.Export(X509ContentType.Cert);
+				X509Certificate cliCert = new X509Certificate(Convert.FromBase64String(config.ClientCertificate), config.ClientCerificatePassphrase);
+				byte[] cliBytes = cliCert.Export(X509ContentType.Cert);
 
-                try
-                {
-                    var tls = new MqttClientOptionsBuilderTlsParameters
-                    {
-                        SslProtocol = System.Security.Authentication.SslProtocols.Tls12 | System.Security.Authentication.SslProtocols.Tls11 | System.Security.Authentication.SslProtocols.Tls,
-                        UseTls = true,
-                        AllowUntrustedCertificates = true,
-                        IgnoreCertificateChainErrors = true,
-                        IgnoreCertificateRevocationErrors = true,
+				try
+				{
+					var tls = new MqttClientOptionsBuilderTlsParameters
+					{
+						SslProtocol = System.Security.Authentication.SslProtocols.Tls12 | System.Security.Authentication.SslProtocols.Tls11 | System.Security.Authentication.SslProtocols.Tls,
+						UseTls = true,
+						AllowUntrustedCertificates = true,
+						IgnoreCertificateChainErrors = true,
+						IgnoreCertificateRevocationErrors = true,
 
-                        Certificates = new List<byte[]>() { caBytes, cliBytes },
+						Certificates = new List<byte[]>() { caBytes, cliBytes },
 
-                        CertificateValidationCallback = (certificate, chain, sslError, opts) => true
+						CertificateValidationCallback = (certificate, chain, sslError, opts) => true
 
-                    };
+					};
 
-                    b = b.WithTls(tls);
+					b = b.WithTls(tls);
 
-                }
-                finally
-                {
-                    caCert.Dispose();
-                    cliCert.Dispose();
-                }
-            }
+				}
+				finally
+				{
+					caCert.Dispose();
+					cliCert.Dispose();
+				}
+			}
 
-            client.ConnectAsync(b.Build()).Wait();
+			client.ConnectAsync(b.Build()).Wait();
 
-            MqttClient mqtt = new MqttClient(client);
+			MqttClient mqtt = new MqttClient(client);
 
-            Guid key = Guid.NewGuid();
+			Guid key = Guid.NewGuid();
 
-            s_instances[key] = mqtt;
+			s_instances[key] = mqtt;
 
-            return key;
-        }
+			return key;
+		}
 
-        public static void Disconnect(Guid key)
-        {
-            MqttClient mqtt = GetClient(key);
-            mqtt.m_mqttClient.DisconnectAsync().Wait();
-            mqtt.m_mqttClient.Dispose();
-        }
+		public static void Disconnect(Guid key)
+		{
+			MqttClient mqtt = GetClient(key);
+			mqtt.m_mqttClient.DisconnectAsync().Wait();
+			mqtt.m_mqttClient.Dispose();
+		}
 
-        public static void Subscribe(Guid key, string topic, string gxproc, int qos)
-        {
-            if (string.IsNullOrEmpty(gxproc))
-                throw new ArgumentNullException(nameof(gxproc), "GeneXus procedure parameter cannot be null");
+		public static void Subscribe(Guid key, string topic, string gxproc, int qos)
+		{
+			if (string.IsNullOrEmpty(gxproc))
+				throw new ArgumentNullException(nameof(gxproc), "GeneXus procedure parameter cannot be null");
 
-            string fileName = $"a{gxproc}.dll";
-            string baseDir = !string.IsNullOrEmpty(AppDomain.CurrentDomain.RelativeSearchPath) ? AppDomain.CurrentDomain.RelativeSearchPath : AppDomain.CurrentDomain.BaseDirectory;
-            string fullPath = Path.Combine(baseDir, fileName);
-            if (!File.Exists(fullPath))
-                throw new FileNotFoundException($"File not found at {fullPath}", fileName);
+			string fileName = $"a{gxproc}.dll";
+			string baseDir = !string.IsNullOrEmpty(AppDomain.CurrentDomain.RelativeSearchPath) ? AppDomain.CurrentDomain.RelativeSearchPath : AppDomain.CurrentDomain.BaseDirectory;
+			string fullPath = Path.Combine(baseDir, fileName);
+			if (!File.Exists(fullPath))
+				throw new FileNotFoundException($"File not found at {fullPath}", fileName);
 
-            MqttClient mqtt = GetClient(key);
-            var a = mqtt.m_mqttClient.SubscribeAsync(topic).Result;
-            mqtt.m_mqttClient.UseApplicationMessageReceivedHandler(msg =>
-            {
-                if (msg == null || msg.ApplicationMessage == null || msg.ApplicationMessage.Payload == null)
-                    return;
+			MqttClient mqtt = GetClient(key);
+			var a = mqtt.m_mqttClient.SubscribeAsync(topic).Result;
+			mqtt.m_mqttClient.UseApplicationMessageReceivedHandler(msg =>
+			{
+				if (msg == null || msg.ApplicationMessage == null || msg.ApplicationMessage.Payload == null)
+					return;
 
-                Console.WriteLine($"Message arrived! Topic:{msg.ApplicationMessage.Topic} Payload:{Encoding.UTF8.GetString(msg.ApplicationMessage.Payload)}");
+				Console.WriteLine($"Message arrived! Topic:{msg.ApplicationMessage.Topic} Payload:{Encoding.UTF8.GetString(msg.ApplicationMessage.Payload)}");
 
-                Assembly asm = Assembly.LoadFrom(fullPath);
-                Type procType = asm.GetTypes().FirstOrDefault(t => t.FullName.EndsWith(gxproc, StringComparison.InvariantCultureIgnoreCase));
+				Assembly asm = Assembly.LoadFrom(fullPath);
+				Type procType = asm.GetTypes().FirstOrDefault(t => t.FullName.EndsWith(gxproc, StringComparison.InvariantCultureIgnoreCase));
 
-                if (procType == null)
-                    throw new InvalidDataException("Data type not found");
+				if (procType == null)
+					throw new InvalidDataException("Data type not found");
 
-                var methodInfo = procType.GetMethod("execute", new Type[] { typeof(string), typeof(string) });
-                if (methodInfo == null)
-                    throw new NotImplementedException("Method 'execute' not found");
+				var methodInfo = procType.GetMethod("execute", new Type[] { typeof(string), typeof(string) });
+				if (methodInfo == null)
+					throw new NotImplementedException("Method 'execute' not found");
 
-                var obj = Activator.CreateInstance(procType);
+				var obj = Activator.CreateInstance(procType);
 
-                methodInfo.Invoke(obj, new object[] { msg.ApplicationMessage.Topic, Encoding.UTF8.GetString(msg.ApplicationMessage.Payload) });
+				methodInfo.Invoke(obj, new object[] { msg.ApplicationMessage.Topic, Encoding.UTF8.GetString(msg.ApplicationMessage.Payload) });
 
-            });
-        }
+			});
+		}
 
-        public static void Unsubscribe(Guid key, string topic)
-        {
-            MqttClient mqtt = GetClient(key);
-            mqtt.m_mqttClient.UnsubscribeAsync(topic).Wait();
-        }
+		public static void Unsubscribe(Guid key, string topic)
+		{
+			MqttClient mqtt = GetClient(key);
+			mqtt.m_mqttClient.UnsubscribeAsync(topic).Wait();
+		}
 
-        public static void Publish(Guid key, string topic, string payload, int qos, bool retainMessage)
-        {
-            MqttClient mqtt = GetClient(key);
-            mqtt.m_mqttClient.PublishAsync(topic, payload, (MQTTnet.Protocol.MqttQualityOfServiceLevel)Enum.ToObject(typeof(MQTTnet.Protocol.MqttQualityOfServiceLevel), qos), retainMessage).Wait();
-        }
+		public static void Publish(Guid key, string topic, string payload, int qos, bool retainMessage)
+		{
+			MqttClient mqtt = GetClient(key);
+			mqtt.m_mqttClient.PublishAsync(topic, payload, (MQTTnet.Protocol.MqttQualityOfServiceLevel)Enum.ToObject(typeof(MQTTnet.Protocol.MqttQualityOfServiceLevel), qos), retainMessage).Wait();
+		}
 
-        static MqttClient GetClient(Guid key)
-        {
-            if (string.IsNullOrEmpty(key.ToString()))
-                throw new ArgumentNullException(nameof(key), "The key cannot be null");
+		static MqttClient GetClient(Guid key)
+		{
+			if (string.IsNullOrEmpty(key.ToString()))
+				throw new ArgumentNullException(nameof(key), "The key cannot be null");
 
-            if (!s_instances.ContainsKey(key))
-                throw new ArgumentOutOfRangeException(nameof(key), "Connection is not open.");
+			if (!s_instances.ContainsKey(key))
+				throw new ArgumentOutOfRangeException(nameof(key), "Connection is not open.");
 
-            return s_instances[key];
-        }
-    }
+			return s_instances[key];
+		}
+	}
 }

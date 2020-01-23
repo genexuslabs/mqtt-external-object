@@ -4,7 +4,7 @@
 ############################### 
 # All files 
 [*] 
-indent_style = space 
+indent_style = tabs 
 # Code files 
 [*.{cs,csx,vb,vbx}] 
 indent_size = 4 

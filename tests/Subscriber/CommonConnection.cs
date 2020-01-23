@@ -4,59 +4,61 @@ using MQTTLib;
 
 namespace Common
 {
-    internal class CommonConnection
-    {
-        public static Guid ConnectTLS()
-        {
-            MqttConfig config = new MqttConfig
-            {
-                ClientCerificatePassphrase = @"genexus",
-                SSLConnection = true,
-                Port = 8884,
-                CAcertificatePath = @"C:\code\genexus\MQTT\tests\OpenSSL\mosquitto.org.crt",
-                ClientCertificatePath = @"C:\code\genexus\MQTT\tests\OpenSSL\cli.pfx"
-            };
+	internal class CommonConnection
+	{
+		public static Guid ConnectTLS()
+		{
+			string passphrase = ConfigurationManager.AppSettings["passphrase"];
+			string caCertificate = ConfigurationManager.AppSettings["caCertificate"];
+			string clientCertificate = ConfigurationManager.AppSettings["clientCertificate"];
 
-            
-            //config.PrivateKey = @"";
+			MqttConfig config = new MqttConfig
+			{
+				ClientCerificatePassphrase = passphrase,
+				SSLConnection = true,
+				Port = 8884,
+				CAcertificate = caCertificate,
+				ClientCertificate = clientCertificate
+			};
 
-            Guid key = MQTTLib.MqttClient.Connect("test.mosquitto.org", config);
 
-            Console.WriteLine("Connected!");
+			Guid key = MQTTLib.MqttClient.Connect("test.mosquitto.org", config);
 
-            return key;
-        }
+			Console.WriteLine("Connected!");
 
-        public static Guid Connect()
-        {
-            MqttConfig config = GetConfig();
+			return key;
+		}
 
-            return Connect(config);
-        }
+		public static Guid Connect()
+		{
+			MqttConfig config = GetConfig();
 
-        static Guid Connect(MqttConfig config)
-        {
-            string url = ConfigurationManager.AppSettings["url"];
+			return Connect(config);
+		}
 
-            Guid key = MQTTLib.MqttClient.Connect(url, config);
+		static Guid Connect(MqttConfig config)
+		{
+			string url = ConfigurationManager.AppSettings["url"];
 
-            Console.WriteLine("Connected!");
+			Guid key = MQTTLib.MqttClient.Connect(url, config);
 
-            return key;
-        }
+			Console.WriteLine("Connected!");
 
-        public static MqttConfig GetConfig()
-        {
-            string user = ConfigurationManager.AppSettings["user"];
-            string password = ConfigurationManager.AppSettings["password"];
+			return key;
+		}
 
-            MqttConfig config = new MQTTLib.MqttConfig
-            {
-                UserName = user,
-                Password = password,
-            };
+		public static MqttConfig GetConfig()
+		{
+			string user = ConfigurationManager.AppSettings["user"];
+			string password = ConfigurationManager.AppSettings["password"];
 
-            return config;
-        }
-    }
+			MqttConfig config = new MQTTLib.MqttConfig
+			{
+				UserName = user,
+				Password = password,
+			};
+
+			return config;
+		}
+	}
 }
