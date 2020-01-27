@@ -11,6 +11,7 @@ namespace Common
 			string passphrase = ConfigurationManager.AppSettings["passphrase"];
 			string caCertificate = ConfigurationManager.AppSettings["caCertificate"];
 			string clientCertificate = ConfigurationManager.AppSettings["clientCertificate"];
+			string privateKey = ConfigurationManager.AppSettings["privateKey"];
 
 			MqttConfig config = new MqttConfig
 			{
@@ -18,7 +19,8 @@ namespace Common
 				SSLConnection = true,
 				Port = 8884,
 				CAcertificate = caCertificate,
-				ClientCertificate = clientCertificate
+				ClientCertificate = clientCertificate,
+				PrivateKey = privateKey
 			};
 
 

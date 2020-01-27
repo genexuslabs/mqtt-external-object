@@ -3,12 +3,18 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using MQTTnet;
 using MQTTnet.Client;
 using MQTTnet.Client.Options;
 using MQTTnet.Formatter;
+using Org.BouncyCastle.Asn1;
+using Org.BouncyCastle.Asn1.Pkcs;
+using Org.BouncyCastle.Crypto;
+using Org.BouncyCastle.Security;
+using Org.BouncyCastle.Utilities.IO.Pem;
 
 namespace MQTTLib
 {
@@ -55,11 +61,14 @@ namespace MQTTLib
 
 			if (config.SSLConnection)
 			{
-				X509Certificate caCert = new X509Certificate(Convert.FromBase64String(config.CAcertificate));
+				string base64CACert = RSAKeys.GetPlainBase64(config.CAcertificate);
+				X509Certificate2 caCert = new X509Certificate2(Convert.FromBase64String(base64CACert));
 				byte[] caBytes = caCert.Export(X509ContentType.Cert);
 
-				X509Certificate cliCert = new X509Certificate(Convert.FromBase64String(config.ClientCertificate), config.ClientCerificatePassphrase);
-				byte[] cliBytes = cliCert.Export(X509ContentType.Cert);
+				string base64Client = RSAKeys.GetPlainBase64(config.ClientCertificate);
+				X509Certificate2 cliCert = new X509Certificate2(Convert.FromBase64String(base64Client), config.ClientCerificatePassphrase);
+				cliCert = cliCert.CopyWithPrivateKey(RSAKeys.ImportPrivateKey(config.PrivateKey, new PasswordFinder(config.ClientCerificatePassphrase)));
+				byte[] cliBytes = cliCert.Export(X509ContentType.Pfx);
 
 				try
 				{
@@ -164,5 +173,7 @@ namespace MQTTLib
 
 			return s_instances[key];
 		}
+
+
 	}
 }

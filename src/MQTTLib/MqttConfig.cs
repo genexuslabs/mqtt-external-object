@@ -22,7 +22,8 @@ namespace MQTTLib
 		//public string CAcertificatePath { get; set; }
 		public string ClientCertificate { get; set; }
 		//public string ClientCertificatePath { get; set; }
-		//public string PrivateKey { get; set; }
+		
+		public string PrivateKey { get; set; }
 		public string ClientCerificatePassphrase { get; set; }
 		public int ProtocolVersion { get; set; } = 500;
 
