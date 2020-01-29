@@ -57,7 +57,7 @@
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
-    <PostBuildEvent>copy $(TargetDir)$(TargetName).* C:\GXmodels\junk\MQTTTest\CSharpModel\Web\bin
-copy $(TargetDir)MQTTnet.dll C:\GXmodels\junk\MQTTTest\CSharpModel\Web\bin</PostBuildEvent>
+    <PostBuildEvent>
+    </PostBuildEvent>
   </PropertyGroup>
 </Project>

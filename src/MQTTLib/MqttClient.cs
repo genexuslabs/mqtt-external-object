@@ -3,18 +3,12 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using MQTTnet;
 using MQTTnet.Client;
 using MQTTnet.Client.Options;
 using MQTTnet.Formatter;
-using Org.BouncyCastle.Asn1;
-using Org.BouncyCastle.Asn1.Pkcs;
-using Org.BouncyCastle.Crypto;
-using Org.BouncyCastle.Security;
-using Org.BouncyCastle.Utilities.IO.Pem;
 
 namespace MQTTLib
 {
@@ -22,9 +16,11 @@ namespace MQTTLib
 	{
 		static Dictionary<Guid, MqttClient> s_instances = new Dictionary<Guid, MqttClient>();
 		readonly IMqttClient m_mqttClient;
-		public MqttClient(IMqttClient mqttClient)
+		readonly MqttConfig m_config;
+		public MqttClient(IMqttClient mqttClient, MqttConfig config)
 		{
 			m_mqttClient = mqttClient;
+			m_config = config;
 		}
 
 		public MqttClient() { }
@@ -38,7 +34,8 @@ namespace MQTTLib
 				.WithClientId(config.ClientId)
 				.WithKeepAlivePeriod(TimeSpan.FromSeconds(config.KeepAlive))
 				.WithMaximumPacketSize(Convert.ToUInt32(config.BufferSize))
-				.WithCommunicationTimeout(TimeSpan.FromSeconds(config.WaitTimeout));
+				.WithCommunicationTimeout(TimeSpan.FromSeconds(config.ConnectionTimeout))
+				.WithCleanSession(!config.PersistentClientSession);
 
 			if (!config.SSLConnection && !string.IsNullOrEmpty(config.UserName) && !string.IsNullOrEmpty(config.Password))
 				b = b.WithCredentials(config.UserName, config.Password);
@@ -98,7 +95,7 @@ namespace MQTTLib
 
 			client.ConnectAsync(b.Build()).Wait();
 
-			MqttClient mqtt = new MqttClient(client);
+			MqttClient mqtt = new MqttClient(client, config);
 
 			Guid key = Guid.NewGuid();
 
@@ -126,7 +123,12 @@ namespace MQTTLib
 				throw new FileNotFoundException($"File not found at {fullPath}", fileName);
 
 			MqttClient mqtt = GetClient(key);
-			var a = mqtt.m_mqttClient.SubscribeAsync(topic).Result;
+
+			if (topic.Contains("*"))
+				if (!mqtt.m_config.AllowWildcardsInTopicFilters)
+					throw new InvalidDataException("Wildcards not allowed for this instance.");
+
+			var a = mqtt.m_mqttClient.SubscribeAsync(topic, (MQTTnet.Protocol.MqttQualityOfServiceLevel)Enum.ToObject(typeof(MQTTnet.Protocol.MqttQualityOfServiceLevel), qos)).Result;
 			mqtt.m_mqttClient.UseApplicationMessageReceivedHandler(msg =>
 			{
 				if (msg == null || msg.ApplicationMessage == null || msg.ApplicationMessage.Payload == null)

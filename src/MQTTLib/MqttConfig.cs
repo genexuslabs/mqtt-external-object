@@ -1,5 +1,4 @@
-﻿using MQTTnet.Formatter;
-using System.IO;
+﻿using System.IO;
 using System.Runtime.Serialization.Json;
 using System.Text;
 
@@ -10,28 +9,19 @@ namespace MQTTLib
 		public int Port { get; set; } = 1883;
 		public int BufferSize { get; set; } = 8192;
 		public int KeepAlive { get; set; } = 0;
-		public int WaitTimeout { get; set; } = 5;
-		//public int ConnectionTimeout { get; set; } = 5000;
-		//public int ReconnectPeriod { get; set; } = 1000;
+		public int ConnectionTimeout { get; set; } = 5;
 		public string UserName { get; set; }
 		public string Password { get; set; }
 		public string MQTTConnectionName { get; set; } = "mqtt_connection1";
 		public string ClientId { get; set; }
 		public bool SSLConnection { get; set; }
 		public string CAcertificate { get; set; }
-		//public string CAcertificatePath { get; set; }
 		public string ClientCertificate { get; set; }
-		//public string ClientCertificatePath { get; set; }
-		
 		public string PrivateKey { get; set; }
 		public string ClientCerificatePassphrase { get; set; }
 		public int ProtocolVersion { get; set; } = 500;
-
-
-		public static MqttConfig Default
-		{
-			get { return new MqttConfig(); }
-		}
+		public bool PersistentClientSession { get; set; }
+		public bool AllowWildcardsInTopicFilters { get; set; }
 
 		public string ExportMqttConfig()
 		{
