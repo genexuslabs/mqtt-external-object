@@ -31,11 +31,15 @@ namespace MQTTLib
 
 			var b = new MqttClientOptionsBuilder()
 				.WithTcpServer(url, config.Port)
-				.WithClientId(config.ClientId)
 				.WithKeepAlivePeriod(TimeSpan.FromSeconds(config.KeepAlive))
 				.WithMaximumPacketSize(Convert.ToUInt32(config.BufferSize))
-				.WithCommunicationTimeout(TimeSpan.FromSeconds(config.ConnectionTimeout))
-				.WithCleanSession(!config.PersistentClientSession);
+				.WithCommunicationTimeout(TimeSpan.FromSeconds(config.ConnectionTimeout));
+
+			if (!string.IsNullOrEmpty(config.ClientId))
+				b = b.WithClientId(config.ClientId);
+
+			if (config.PersistentClientSession)
+				b = b.WithCleanSession(!config.PersistentClientSession);
 
 			if (!config.SSLConnection && !string.IsNullOrEmpty(config.UserName) && !string.IsNullOrEmpty(config.Password))
 				b = b.WithCredentials(config.UserName, config.Password);
