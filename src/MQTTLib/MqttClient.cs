@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reflection;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
+using System.Threading.Tasks;
 using MQTTnet;
 using MQTTnet.Client;
 using MQTTnet.Client.Options;
@@ -25,6 +26,16 @@ namespace MQTTLib
 
 		public MqttClient() { }
 
+		private static readonly object balanceLock = new object();
+		static Dictionary<Guid, MqttClient> Connections
+		{
+			get
+			{
+				lock (balanceLock)
+					return s_instances;
+			}
+		}
+
 		public static Guid Connect(string url, MqttConfig config)
 		{
 			IMqttClient client = new MqttFactory().CreateMqttClient();
@@ -33,13 +44,12 @@ namespace MQTTLib
 				.WithTcpServer(url, config.Port)
 				.WithKeepAlivePeriod(TimeSpan.FromSeconds(config.KeepAlive))
 				.WithMaximumPacketSize(Convert.ToUInt32(config.BufferSize))
-				.WithCommunicationTimeout(TimeSpan.FromSeconds(config.ConnectionTimeout));
+				.WithCommunicationTimeout(TimeSpan.FromSeconds(config.ConnectionTimeout))
+				.WithCleanSession(!config.PersistentClientSession);
+
 
 			if (!string.IsNullOrEmpty(config.ClientId))
 				b = b.WithClientId(config.ClientId);
-
-			if (config.PersistentClientSession)
-				b = b.WithCleanSession(!config.PersistentClientSession);
 
 			if (!config.SSLConnection && !string.IsNullOrEmpty(config.UserName) && !string.IsNullOrEmpty(config.Password))
 				b = b.WithCredentials(config.UserName, config.Password);
@@ -97,13 +107,30 @@ namespace MQTTLib
 				}
 			}
 
+			Guid key = Guid.NewGuid();
+
+			client.UseDisconnectedHandler(async e =>
+			{
+				try
+				{
+					if (Connections.ContainsKey(key))
+					{
+						await Task.Delay(TimeSpan.FromSeconds(config.AutoReconnectDelay));
+						await client.ReconnectAsync();
+					}
+				}
+				catch
+				{
+					Connections.Remove(key);
+					client.Dispose();
+				}
+			});
+
 			client.ConnectAsync(b.Build()).Wait();
 
 			MqttClient mqtt = new MqttClient(client, config);
 
-			Guid key = Guid.NewGuid();
-
-			s_instances[key] = mqtt;
+			Connections[key] = mqtt;
 
 			return key;
 		}
@@ -111,7 +138,8 @@ namespace MQTTLib
 		public static void Disconnect(Guid key)
 		{
 			MqttClient mqtt = GetClient(key);
-			mqtt.m_mqttClient.DisconnectAsync().Wait();
+			Connections.Remove(key);
+			mqtt.m_mqttClient.DisconnectAsync(new MQTTnet.Client.Disconnecting.MqttClientDisconnectOptions() { ReasonCode = MQTTnet.Client.Disconnecting.MqttClientDisconnectReason.NormalDisconnection, ReasonString = "Disconnected by user" }).Wait();
 			mqtt.m_mqttClient.Dispose();
 		}
 
@@ -128,7 +156,7 @@ namespace MQTTLib
 
 			MqttClient mqtt = GetClient(key);
 
-			if (topic.Contains("*"))
+			if (topic.Contains("*") || topic.Contains("+") || topic.Contains("#"))
 				if (!mqtt.m_config.AllowWildcardsInTopicFilters)
 					throw new InvalidDataException("Wildcards not allowed for this instance.");
 
@@ -169,15 +197,24 @@ namespace MQTTLib
 			mqtt.m_mqttClient.PublishAsync(topic, payload, (MQTTnet.Protocol.MqttQualityOfServiceLevel)Enum.ToObject(typeof(MQTTnet.Protocol.MqttQualityOfServiceLevel), qos), retainMessage).Wait();
 		}
 
+		public static bool IsConnected(Guid key)
+		{
+			MqttClient mqtt = GetClient(key);
+			if (mqtt == null || mqtt.m_mqttClient == null)
+				return false;
+
+			return mqtt.m_mqttClient.IsConnected;
+		}
+
 		static MqttClient GetClient(Guid key)
 		{
 			if (string.IsNullOrEmpty(key.ToString()))
 				throw new ArgumentNullException(nameof(key), "The key cannot be null");
 
-			if (!s_instances.ContainsKey(key))
-				throw new ArgumentOutOfRangeException(nameof(key), "Connection is not open.");
+			if (!Connections.ContainsKey(key))
+				throw new ArgumentOutOfRangeException(nameof(key), $"{key} does not hold a valid connection.");
 
-			return s_instances[key];
+			return Connections[key];
 		}
 
 

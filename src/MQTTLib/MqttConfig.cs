@@ -22,6 +22,7 @@ namespace MQTTLib
 		public int ProtocolVersion { get; set; } = 500;
 		public bool PersistentClientSession { get; set; }
 		public bool AllowWildcardsInTopicFilters { get; set; }
+		public int AutoReconnectDelay { get; set; } = 5;
 
 		public string ExportMqttConfig()
 		{
