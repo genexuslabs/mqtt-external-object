@@ -24,11 +24,14 @@ namespace Common
 			};
 
 
-			Guid key = MQTTLib.MqttClient.Connect("test.mosquitto.org", config);
+			MqttStatus status = MQTTLib.MqttClient.Connect("test.mosquitto.org", config);
 
-			Console.WriteLine("Connected!");
+			if (!status.Error)
+				Console.WriteLine("Connected!");
+			else
+				Console.WriteLine($"Error:{status.ErrorMessage}");
 
-			return key;
+			return status.Key;
 		}
 
 		public static Guid Connect()
@@ -42,11 +45,14 @@ namespace Common
 		{
 			string url = ConfigurationManager.AppSettings["url"];
 
-			Guid key = MQTTLib.MqttClient.Connect(url, config);
+			MqttStatus status = MQTTLib.MqttClient.Connect(url, config);
 
-			Console.WriteLine("Connected!");
+			if (!status.Error)
+				Console.WriteLine("Connected!");
+			else
+				Console.WriteLine($"Error:{status.ErrorMessage}");
 
-			return key;
+			return status.Key;
 		}
 
 		public static MqttConfig GetConfig()
