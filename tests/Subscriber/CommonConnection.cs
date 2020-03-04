@@ -23,7 +23,6 @@ namespace Common
 				PrivateKey = privateKey
 			};
 
-
 			MqttStatus status = MQTTLib.MqttClient.Connect("test.mosquitto.org", config);
 
 			if (!status.Error)
@@ -57,7 +56,7 @@ namespace Common
 
 		public static MqttConfig GetConfig()
 		{
-			string user = ConfigurationManager.AppSettings["user"];
+			string user = "";// ConfigurationManager.AppSettings["user"];
 			string password = ConfigurationManager.AppSettings["password"];
 
 			MqttConfig config = new MQTTLib.MqttConfig

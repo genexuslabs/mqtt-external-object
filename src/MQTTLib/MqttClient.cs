@@ -51,11 +51,10 @@ namespace MQTTLib
 					.WithCommunicationTimeout(TimeSpan.FromSeconds(config.ConnectionTimeout))
 					.WithCleanSession(!config.PersistentClientSession);
 
-
 				if (!string.IsNullOrEmpty(config.ClientId))
 					b = b.WithClientId(config.ClientId);
 
-				if (!config.SSLConnection && !string.IsNullOrEmpty(config.UserName) && !string.IsNullOrEmpty(config.Password))
+				if (!config.SSLConnection)
 					b = b.WithCredentials(config.UserName, config.Password);
 
 				switch (config.ProtocolVersion)

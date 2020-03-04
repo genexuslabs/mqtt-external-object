@@ -10,7 +10,9 @@ namespace Publisher
 		{
 			try
 			{
-				Guid key = Common.CommonConnection.ConnectTLS();
+				//Guid key = Common.CommonConnection.ConnectTLS();
+				Guid key = Common.CommonConnection.Connect();
+
 
 				string topic = ConfigurationManager.AppSettings["topic"];
 
