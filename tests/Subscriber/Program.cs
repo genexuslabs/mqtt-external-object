@@ -10,11 +10,15 @@ namespace Subscriber
 		{
 			try
 			{
-				Guid key = Common.CommonConnection.ConnectTLS();
+				//Guid key = Common.CommonConnection.ConnectTLS();
+				Guid key = Common.CommonConnection.Connect();
 
 				string topic = ConfigurationManager.AppSettings["topic"];
 
-				MqttClient.Subscribe(key, topic, "SaveMessage", 2);
+				MqttStatus status = MqttClient.Subscribe(key, topic, "SaveMessage", 2);
+
+				if (status.Error)
+					throw new Exception(status.ErrorMessage);
 
 				Console.WriteLine($"Subscribed to topic:{topic}");
 				Console.WriteLine($"Press <enter> to exit...");

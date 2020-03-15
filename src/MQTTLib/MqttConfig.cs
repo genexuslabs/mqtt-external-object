@@ -20,9 +20,10 @@ namespace MQTTLib
 		public string PrivateKey { get; set; }
 		public string ClientCerificatePassphrase { get; set; }
 		public int ProtocolVersion { get; set; } = 500;
-		public bool PersistentClientSession { get; set; }
+		public bool CleanSession { get; set; }
 		public bool AllowWildcardsInTopicFilters { get; set; }
 		public int AutoReconnectDelay { get; set; } = 5;
+		public int SessionExpiryInterval { get; set; } = 0;
 
 		public string ExportMqttConfig()
 		{

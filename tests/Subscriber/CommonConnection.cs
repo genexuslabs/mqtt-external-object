@@ -62,7 +62,7 @@ namespace Common
 			MqttConfig config = new MQTTLib.MqttConfig
 			{
 				UserName = user,
-				Password = password,
+				Password = password
 			};
 
 			return config;

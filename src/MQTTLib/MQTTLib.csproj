@@ -39,6 +39,7 @@
     <Compile Include="MqttClient.cs" />
     <Compile Include="MqttConfig.cs" />
     <Compile Include="MqttStatus.cs" />
+    <Compile Include="PreviousSubscription.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="RSAKeys.cs" />
   </ItemGroup>

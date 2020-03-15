@@ -21,7 +21,10 @@ namespace Publisher
 				string command = Console.ReadLine();
 				while (command != "exit")
 				{
-					MqttClient.Publish(key, topic, command, 2, false);
+					MqttStatus status=  MqttClient.Publish(key, topic, command, 2, true, 1);
+					if (status.Error)
+						throw new Exception(status.ErrorMessage);
+
 					command = Console.ReadLine();
 				}
 

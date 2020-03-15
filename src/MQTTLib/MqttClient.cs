@@ -3,13 +3,17 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.Serialization.Json;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading.Tasks;
 using MQTTnet;
 using MQTTnet.Client;
+using MQTTnet.Client.Connecting;
 using MQTTnet.Client.Options;
+using MQTTnet.Client.Subscribing;
 using MQTTnet.Formatter;
+using MQTTnet.Packets;
 
 namespace MQTTLib
 {
@@ -18,6 +22,7 @@ namespace MQTTLib
 		static Dictionary<Guid, MqttClient> s_instances = new Dictionary<Guid, MqttClient>();
 		readonly IMqttClient m_mqttClient;
 		readonly MqttConfig m_config;
+
 		public MqttClient(IMqttClient mqttClient, MqttConfig config)
 		{
 			m_mqttClient = mqttClient;
@@ -38,6 +43,7 @@ namespace MQTTLib
 
 		public static MqttStatus Connect(string url, MqttConfig config)
 		{
+			System.Diagnostics.Debugger.Launch();
 			Guid key = Guid.NewGuid();
 
 			try
@@ -49,7 +55,10 @@ namespace MQTTLib
 					.WithKeepAlivePeriod(TimeSpan.FromSeconds(config.KeepAlive))
 					.WithMaximumPacketSize(Convert.ToUInt32(config.BufferSize))
 					.WithCommunicationTimeout(TimeSpan.FromSeconds(config.ConnectionTimeout))
-					.WithCleanSession(!config.PersistentClientSession);
+					.WithCleanSession(config.CleanSession);
+
+				if (config.SessionExpiryInterval > 0)
+					b = b.WithSessionExpiryInterval((uint)config.SessionExpiryInterval);
 
 				if (!string.IsNullOrEmpty(config.ClientId))
 					b = b.WithClientId(config.ClientId);
@@ -115,6 +124,8 @@ namespace MQTTLib
 				{
 					try
 					{
+						//System.Diagnostics.Debugger.Launch();
+
 						if (Connections.ContainsKey(key))
 						{
 							await Task.Delay(TimeSpan.FromSeconds(config.AutoReconnectDelay));
@@ -128,11 +139,13 @@ namespace MQTTLib
 					}
 				});
 
-				client.ConnectAsync(b.Build()).Wait();
+				MqttClientAuthenticateResult result = client.ConnectAsync(b.Build()).GetAwaiter().GetResult();
 
 				MqttClient mqtt = new MqttClient(client, config);
 
 				Connections[key] = mqtt;
+
+				SubscribePreviousConnection(key, result);
 
 			}
 			catch (Exception ex)
@@ -149,7 +162,7 @@ namespace MQTTLib
 			{
 				MqttClient mqtt = GetClient(key);
 				Connections.Remove(key);
-				mqtt.m_mqttClient.DisconnectAsync(new MQTTnet.Client.Disconnecting.MqttClientDisconnectOptions() { ReasonCode = MQTTnet.Client.Disconnecting.MqttClientDisconnectReason.NormalDisconnection, ReasonString = "Disconnected by user" }).Wait();
+				mqtt.m_mqttClient.DisconnectAsync(new MQTTnet.Client.Disconnecting.MqttClientDisconnectOptions() { ReasonCode = MQTTnet.Client.Disconnecting.MqttClientDisconnectReason.NormalDisconnection, ReasonString = "Disconnected by user" }).GetAwaiter().GetResult();
 				mqtt.m_mqttClient.Dispose();
 			}
 			catch (Exception ex)
@@ -158,6 +171,32 @@ namespace MQTTLib
 			}
 
 			return MqttStatus.Success(key);
+		}
+
+		private static void SubscribePreviousConnection(Guid key, MqttClientAuthenticateResult result)
+		{
+			if (!result.IsSessionPresent)
+				return;
+
+			string topic;
+			string gxProc;
+			int qos;
+			for (int i = 0; i < result.UserProperties.Count; i++)
+			{
+				MqttUserProperty prop = result.UserProperties[i];
+				if (prop.Name == "subscriptions")
+				{
+					using (var ms = new MemoryStream(Encoding.Unicode.GetBytes(prop.Value)))
+					{
+						DataContractJsonSerializer serializer = new DataContractJsonSerializer(typeof(SubscriptionList));
+						SubscriptionList list = (SubscriptionList)serializer.ReadObject(ms);
+						foreach (PreviousSubscription subscription in list)
+						{
+							Subscribe(key, subscription.topic, "SaveMessage", subscription.qos);
+						}
+					}
+				}
+			}
 		}
 
 		public static MqttStatus Subscribe(Guid key, string topic, string gxproc, int qos)
@@ -179,7 +218,16 @@ namespace MQTTLib
 					if (!mqtt.m_config.AllowWildcardsInTopicFilters)
 						throw new InvalidDataException("Wildcards not allowed for this instance.");
 
-				var a = mqtt.m_mqttClient.SubscribeAsync(topic, (MQTTnet.Protocol.MqttQualityOfServiceLevel)Enum.ToObject(typeof(MQTTnet.Protocol.MqttQualityOfServiceLevel), qos)).Result;
+				MqttClientSubscribeOptions options = new MqttClientSubscribeOptions
+				{
+					TopicFilters = new List<TopicFilter> { new TopicFilter() { Topic = topic, QualityOfServiceLevel = (MQTTnet.Protocol.MqttQualityOfServiceLevel)Enum.ToObject(typeof(MQTTnet.Protocol.MqttQualityOfServiceLevel), qos) } },
+					UserProperties = new List<MqttUserProperty> { new MqttUserProperty("gxrocedure", gxproc.ToLower()) }
+				};
+
+				System.Diagnostics.Debugger.Launch();
+
+				MqttClientSubscribeResult result = mqtt.m_mqttClient.SubscribeAsync(options).GetAwaiter().GetResult();
+
 				mqtt.m_mqttClient.UseApplicationMessageReceivedHandler(msg =>
 				{
 					if (msg == null || msg.ApplicationMessage == null || msg.ApplicationMessage.Payload == null)
@@ -199,7 +247,21 @@ namespace MQTTLib
 
 					var obj = Activator.CreateInstance(procType);
 
-					methodInfo.Invoke(obj, new object[] { msg.ApplicationMessage.Topic, Encoding.UTF8.GetString(msg.ApplicationMessage.Payload) });
+					try
+					{
+						methodInfo.Invoke(obj, new object[] { msg.ApplicationMessage.Topic, Encoding.UTF8.GetString(msg.ApplicationMessage.Payload) });
+					}
+					catch (Exception ex)
+					{
+						Console.WriteLine($"Error executing the procedure at '{fullPath}'");
+						Console.WriteLine(ex.Message);
+						Exception inner = ex.InnerException;
+						while (inner != null)
+						{
+							Console.WriteLine(inner.Message);
+							inner = inner.InnerException;
+						}
+					}
 
 				});
 			}
@@ -216,7 +278,7 @@ namespace MQTTLib
 			try
 			{
 				MqttClient mqtt = GetClient(key);
-				mqtt.m_mqttClient.UnsubscribeAsync(topic).Wait();
+				mqtt.m_mqttClient.UnsubscribeAsync(topic).GetAwaiter().GetResult();
 			}
 			catch (Exception ex)
 			{
@@ -226,12 +288,20 @@ namespace MQTTLib
 			return MqttStatus.Success(key);
 		}
 
-		public static MqttStatus Publish(Guid key, string topic, string payload, int qos, bool retainMessage)
+		public static MqttStatus Publish(Guid key, string topic, string payload, int qos, bool retainMessage, int messageExpiryInterval)
 		{
 			try
 			{
 				MqttClient mqtt = GetClient(key);
-				mqtt.m_mqttClient.PublishAsync(topic, payload, (MQTTnet.Protocol.MqttQualityOfServiceLevel)Enum.ToObject(typeof(MQTTnet.Protocol.MqttQualityOfServiceLevel), qos), retainMessage).Wait();
+				MqttApplicationMessage msg = new MqttApplicationMessage
+				{
+					MessageExpiryInterval = messageExpiryInterval > 0 ? (uint)messageExpiryInterval : 0,
+					Payload = Encoding.UTF8.GetBytes(payload),
+					Topic = topic,
+					QualityOfServiceLevel = (MQTTnet.Protocol.MqttQualityOfServiceLevel)Enum.ToObject(typeof(MQTTnet.Protocol.MqttQualityOfServiceLevel), qos),
+					Retain = retainMessage
+				};
+				mqtt.m_mqttClient.PublishAsync(msg).GetAwaiter().GetResult();
 			}
 			catch (Exception ex)
 			{
