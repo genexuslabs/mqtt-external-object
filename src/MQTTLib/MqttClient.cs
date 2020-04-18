@@ -17,9 +17,11 @@ using MQTTnet.Packets;
 
 namespace MQTTLib
 {
-	public class MqttClient
+    public class MqttClient
 	{
 		static Dictionary<Guid, MqttClient> s_instances = new Dictionary<Guid, MqttClient>();
+		static Dictionary<string, string> s_topicProcs = new Dictionary<string, string>();
+
 		readonly IMqttClient m_mqttClient;
 		readonly MqttConfig m_config;
 
@@ -43,12 +45,15 @@ namespace MQTTLib
 
 		public static MqttStatus Connect(string url, MqttConfig config)
 		{
-			System.Diagnostics.Debugger.Launch();
 			Guid key = Guid.NewGuid();
 
 			try
 			{
+#if DEBUG
+				IMqttClient client = new MqttFactory().CreateMqttClient(new ConsoleLogger());
+#else
 				IMqttClient client = new MqttFactory().CreateMqttClient();
+#endif
 
 				var b = new MqttClientOptionsBuilder()
 					.WithTcpServer(url, config.Port)
@@ -103,10 +108,10 @@ namespace MQTTLib
 							IgnoreCertificateChainErrors = true,
 							IgnoreCertificateRevocationErrors = true,
 
-							Certificates = new List<byte[]>() { caBytes, cliBytes },
-
+							Certificates = new List<X509Certificate>() { caCert, cliCert },
+							//CertificateValidationHandler = context => true
 							CertificateValidationCallback = (certificate, chain, sslError, opts) => true
-
+						
 						};
 
 						b = b.WithTls(tls);
@@ -124,8 +129,6 @@ namespace MQTTLib
 				{
 					try
 					{
-						//System.Diagnostics.Debugger.Launch();
-
 						if (Connections.ContainsKey(key))
 						{
 							await Task.Delay(TimeSpan.FromSeconds(config.AutoReconnectDelay));
@@ -178,9 +181,6 @@ namespace MQTTLib
 			if (!result.IsSessionPresent)
 				return;
 
-			string topic;
-			string gxProc;
-			int qos;
 			for (int i = 0; i < result.UserProperties.Count; i++)
 			{
 				MqttUserProperty prop = result.UserProperties[i];
@@ -192,7 +192,10 @@ namespace MQTTLib
 						SubscriptionList list = (SubscriptionList)serializer.ReadObject(ms);
 						foreach (PreviousSubscription subscription in list)
 						{
-							Subscribe(key, subscription.topic, "SaveMessage", subscription.qos);
+							MqttClient client = GetClient(key);
+							string procKey = GetProcKey(client, subscription.topic);
+							if (s_topicProcs.ContainsKey(procKey))
+								Subscribe(key, subscription.topic, s_topicProcs[procKey], subscription.qos);
 						}
 					}
 				}
@@ -220,13 +223,13 @@ namespace MQTTLib
 
 				MqttClientSubscribeOptions options = new MqttClientSubscribeOptions
 				{
+					//TopicFilters = new List<MqttTopicFilter> { new MqttTopicFilter() { Topic = topic, QualityOfServiceLevel = (MQTTnet.Protocol.MqttQualityOfServiceLevel)Enum.ToObject(typeof(MQTTnet.Protocol.MqttQualityOfServiceLevel), qos) } },
 					TopicFilters = new List<TopicFilter> { new TopicFilter() { Topic = topic, QualityOfServiceLevel = (MQTTnet.Protocol.MqttQualityOfServiceLevel)Enum.ToObject(typeof(MQTTnet.Protocol.MqttQualityOfServiceLevel), qos) } },
-					UserProperties = new List<MqttUserProperty> { new MqttUserProperty("gxrocedure", gxproc.ToLower()) }
+					UserProperties = new List<MqttUserProperty> { new MqttUserProperty("gxrocedure", $"{{\"gxrocedure\":\"{gxproc}\"}}") }
 				};
 
-				System.Diagnostics.Debugger.Launch();
-
 				MqttClientSubscribeResult result = mqtt.m_mqttClient.SubscribeAsync(options).GetAwaiter().GetResult();
+				s_topicProcs[GetProcKey(mqtt,topic)] = gxproc;
 
 				mqtt.m_mqttClient.UseApplicationMessageReceivedHandler(msg =>
 				{
@@ -279,6 +282,9 @@ namespace MQTTLib
 			{
 				MqttClient mqtt = GetClient(key);
 				mqtt.m_mqttClient.UnsubscribeAsync(topic).GetAwaiter().GetResult();
+				string procKey = GetProcKey(mqtt, topic);
+				if (s_topicProcs.ContainsKey(procKey))
+					s_topicProcs.Remove(procKey);
 			}
 			catch (Exception ex)
 			{
@@ -337,6 +343,6 @@ namespace MQTTLib
 			return Connections[key];
 		}
 
-
+		static string GetProcKey(MqttClient client, string topic) => $"{client.m_mqttClient.Options.ClientId}:{topic}";
 	}
 }
