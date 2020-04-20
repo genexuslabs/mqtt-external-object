@@ -16,8 +16,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		.editorconfig = .editorconfig
 	EndProjectSection
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MQTTnet", "..\..\sebastian\mqttnet\Source\MQTTnet\MQTTnet.csproj", "{B556ECB3-0E40-46E5-AE5F-6F46CE101EE4}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -36,10 +34,6 @@ Global
 		{102071CB-35F5-48E1-A029-2D8755756DEA}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{102071CB-35F5-48E1-A029-2D8755756DEA}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{102071CB-35F5-48E1-A029-2D8755756DEA}.Release|Any CPU.Build.0 = Release|Any CPU
-		{B556ECB3-0E40-46E5-AE5F-6F46CE101EE4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{B556ECB3-0E40-46E5-AE5F-6F46CE101EE4}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{B556ECB3-0E40-46E5-AE5F-6F46CE101EE4}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{B556ECB3-0E40-46E5-AE5F-6F46CE101EE4}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
