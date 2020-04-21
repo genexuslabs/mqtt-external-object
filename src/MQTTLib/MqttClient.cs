@@ -17,7 +17,7 @@ using MQTTnet.Packets;
 
 namespace MQTTLib
 {
-    public class MqttClient
+	public class MqttClient
 	{
 		static Dictionary<Guid, MqttClient> s_instances = new Dictionary<Guid, MqttClient>();
 		static Dictionary<string, string> s_topicProcs = new Dictionary<string, string>();
@@ -111,7 +111,7 @@ namespace MQTTLib
 							Certificates = new List<X509Certificate>() { caCert, cliCert },
 							//CertificateValidationHandler = context => true
 							CertificateValidationCallback = (certificate, chain, sslError, opts) => true
-						
+
 						};
 
 						b = b.WithTls(tls);
@@ -228,9 +228,6 @@ namespace MQTTLib
 					UserProperties = new List<MqttUserProperty> { new MqttUserProperty("gxrocedure", $"{{\"gxrocedure\":\"{gxproc}\"}}") }
 				};
 
-				MqttClientSubscribeResult result = mqtt.m_mqttClient.SubscribeAsync(options).GetAwaiter().GetResult();
-				s_topicProcs[GetProcKey(mqtt,topic)] = gxproc;
-
 				mqtt.m_mqttClient.UseApplicationMessageReceivedHandler(msg =>
 				{
 					if (msg == null || msg.ApplicationMessage == null || msg.ApplicationMessage.Payload == null)
@@ -238,20 +235,21 @@ namespace MQTTLib
 
 					Console.WriteLine($"Message arrived! Topic:{msg.ApplicationMessage.Topic} Payload:{Encoding.UTF8.GetString(msg.ApplicationMessage.Payload)}");
 
-					Assembly asm = Assembly.LoadFrom(fullPath);
-					Type procType = asm.GetTypes().FirstOrDefault(t => t.FullName.EndsWith(gxproc, StringComparison.InvariantCultureIgnoreCase));
-
-					if (procType == null)
-						throw new InvalidDataException("Data type not found");
-
-					var methodInfo = procType.GetMethod("execute", new Type[] { typeof(string), typeof(string) });
-					if (methodInfo == null)
-						throw new NotImplementedException("Method 'execute' not found");
-
-					var obj = Activator.CreateInstance(procType);
-
 					try
 					{
+						Assembly asm = Assembly.LoadFrom(fullPath);
+						Type procType = asm.GetTypes().FirstOrDefault(t => t.FullName.EndsWith(gxproc, StringComparison.InvariantCultureIgnoreCase));
+
+						if (procType == null)
+							throw new InvalidDataException("Data type not found");
+
+						var methodInfo = procType.GetMethod("execute", new Type[] { typeof(string), typeof(string) });
+						if (methodInfo == null)
+							throw new NotImplementedException("Method 'execute' not found");
+
+						var obj = Activator.CreateInstance(procType);
+
+
 						methodInfo.Invoke(obj, new object[] { msg.ApplicationMessage.Topic, Encoding.UTF8.GetString(msg.ApplicationMessage.Payload) });
 					}
 					catch (Exception ex)
@@ -267,6 +265,10 @@ namespace MQTTLib
 					}
 
 				});
+
+				MqttClientSubscribeResult result = mqtt.m_mqttClient.SubscribeAsync(options).GetAwaiter().GetResult();
+				s_topicProcs[GetProcKey(mqtt, topic)] = gxproc;
+
 			}
 			catch (Exception ex)
 			{
