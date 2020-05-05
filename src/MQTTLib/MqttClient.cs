@@ -132,7 +132,8 @@ namespace MQTTLib
 						if (Connections.ContainsKey(key))
 						{
 							await Task.Delay(TimeSpan.FromSeconds(config.AutoReconnectDelay));
-							await client.ReconnectAsync();
+							MqttClientAuthenticateResult reconnectResult = await client.ConnectAsync(b.Build());
+							SubscribePreviousConnection(key, reconnectResult);
 						}
 					}
 					catch
@@ -232,9 +233,11 @@ namespace MQTTLib
 				{
 					if (msg == null || msg.ApplicationMessage == null || msg.ApplicationMessage.Payload == null)
 						return;
-
+#if DEBUG
+					Console.WriteLine("");
 					Console.WriteLine($"Message arrived! Topic:{msg.ApplicationMessage.Topic} Payload:{Encoding.UTF8.GetString(msg.ApplicationMessage.Payload)}");
-
+					Console.WriteLine("");
+#endif
 					try
 					{
 						Assembly asm = Assembly.LoadFrom(fullPath);
@@ -248,8 +251,6 @@ namespace MQTTLib
 							throw new NotImplementedException("Method 'execute' not found");
 
 						var obj = Activator.CreateInstance(procType);
-
-
 						methodInfo.Invoke(obj, new object[] { msg.ApplicationMessage.Topic, Encoding.UTF8.GetString(msg.ApplicationMessage.Payload) });
 					}
 					catch (Exception ex)

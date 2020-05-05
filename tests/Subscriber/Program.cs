@@ -10,12 +10,23 @@ namespace Subscriber
 		{
 			try
 			{
+				MqttConfig config = Common.CommonConnection.GetConfig();
+
 				//Guid key = Common.CommonConnection.ConnectTLS();
-				Guid key = Common.CommonConnection.Connect();
+
+
+				config.CleanSession = false;
+				config.ClientId = "MyTest";
+
+				Guid key = Common.CommonConnection.Connect(config);
 
 				string topic = ConfigurationManager.AppSettings["topic"];
 
-				MqttStatus status = MqttClient.Subscribe(key, topic, "SaveMessage", 2);
+
+				Console.WriteLine($"Press <enter> to subscribe...");
+				Console.ReadLine();
+
+				MqttStatus status = MqttClient.Subscribe(key, topic, "SaveMessage", 1);
 
 				if (status.Error)
 					throw new Exception(status.ErrorMessage);
@@ -23,6 +34,7 @@ namespace Subscriber
 				Console.WriteLine($"Subscribed to topic:{topic}");
 				Console.WriteLine($"Press <enter> to exit...");
 				Console.ReadLine();
+				MqttClient.Disconnect(key);
 			}
 			catch (Exception ex)
 			{

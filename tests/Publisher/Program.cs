@@ -21,12 +21,14 @@ namespace Publisher
 				string command = Console.ReadLine();
 				while (command != "exit")
 				{
-					MqttStatus status=  MqttClient.Publish(key, topic, command, 2, true, 1);
+					MqttStatus status=  MqttClient.Publish(key, topic, command, 1, false, 60);
 					if (status.Error)
 						throw new Exception(status.ErrorMessage);
 
 					command = Console.ReadLine();
 				}
+
+				MqttClient.Disconnect(key);
 
 			}
 			catch (Exception ex)

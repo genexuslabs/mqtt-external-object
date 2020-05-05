@@ -20,7 +20,7 @@ namespace MQTTLib
 		public string PrivateKey { get; set; }
 		public string ClientCerificatePassphrase { get; set; }
 		public int ProtocolVersion { get; set; } = 500;
-		public bool CleanSession { get; set; }
+		public bool CleanSession { get; set; } = true;
 		public bool AllowWildcardsInTopicFilters { get; set; }
 		public int AutoReconnectDelay { get; set; } = 5;
 		public int SessionExpiryInterval { get; set; } = 0;

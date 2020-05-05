@@ -40,7 +40,7 @@ namespace Common
 			return Connect(config);
 		}
 
-		static Guid Connect(MqttConfig config)
+		public static Guid Connect(MqttConfig config)
 		{
 			string url = ConfigurationManager.AppSettings["url"];
 
