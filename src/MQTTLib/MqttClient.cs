@@ -20,7 +20,7 @@ namespace MQTTLib
 	public class MqttClient
 	{
 		static Dictionary<Guid, MqttClient> s_instances = new Dictionary<Guid, MqttClient>();
-		static Dictionary<string, string> s_topicProcs = new Dictionary<string, string>();
+		Dictionary<string, string> s_topicProcs = new Dictionary<string, string>();
 
 		readonly IMqttClient m_mqttClient;
 		readonly MqttConfig m_config;
@@ -40,6 +40,67 @@ namespace MQTTLib
 			{
 				lock (balanceLock)
 					return s_instances;
+			}
+		}
+
+		void AddTopic(string topic, string gxProc)
+		{
+			s_topicProcs[topic] = gxProc;
+		}
+
+		void RemoveTopic(string topic)
+		{
+			if (s_topicProcs.ContainsKey(topic))
+				s_topicProcs.Remove(topic);
+		}
+
+		string GetProc(string topic)
+		{
+			if (s_topicProcs.ContainsKey(topic))
+				return s_topicProcs[topic];
+
+			return null;
+		}
+
+		public void ProcessMessage(MqttApplicationMessageReceivedEventArgs msg)
+		{
+			if (msg == null || msg.ApplicationMessage == null || msg.ApplicationMessage.Payload == null)
+				return;
+#if DEBUG
+			Console.WriteLine("");
+			Console.WriteLine($"Message arrived! Topic:{msg.ApplicationMessage.Topic} Payload:{Encoding.UTF8.GetString(msg.ApplicationMessage.Payload)}");
+			Console.WriteLine("");
+#endif
+
+			string fullPath = GetProc(msg.ApplicationMessage.Topic);
+			try
+			{
+				FileInfo info = new FileInfo(fullPath);
+				string className = info.Name.Substring(1).Replace(info.Extension, string.Empty); //it's a main. There's a stub (a) 
+
+				Assembly asm = Assembly.LoadFrom(fullPath);
+				Type procType = asm.GetTypes().FirstOrDefault(t => t.FullName.EndsWith(className, StringComparison.InvariantCultureIgnoreCase));
+
+				if (procType == null)
+					throw new InvalidDataException("Data type not found");
+
+				var methodInfo = procType.GetMethod("execute", new Type[] { typeof(string), typeof(string) });
+				if (methodInfo == null)
+					throw new NotImplementedException("Method 'execute' not found");
+
+				var obj = Activator.CreateInstance(procType);
+				methodInfo.Invoke(obj, new object[] { msg.ApplicationMessage.Topic, Encoding.UTF8.GetString(msg.ApplicationMessage.Payload) });
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"Error executing the procedure at '{fullPath}'");
+				Console.WriteLine(ex.Message);
+				Exception inner = ex.InnerException;
+				while (inner != null)
+				{
+					Console.WriteLine(inner.Message);
+					inner = inner.InnerException;
+				}
 			}
 		}
 
@@ -194,9 +255,9 @@ namespace MQTTLib
 						foreach (PreviousSubscription subscription in list)
 						{
 							MqttClient client = GetClient(key);
-							string procKey = GetProcKey(client, subscription.topic);
-							if (s_topicProcs.ContainsKey(procKey))
-								Subscribe(key, subscription.topic, s_topicProcs[procKey], subscription.qos);
+							string gxproc = client.GetProc(subscription.topic);
+							if (!string.IsNullOrEmpty(gxproc))
+								Subscribe(key, subscription.topic, gxproc, subscription.qos);
 						}
 					}
 				}
@@ -210,11 +271,16 @@ namespace MQTTLib
 				if (string.IsNullOrEmpty(gxproc))
 					throw new ArgumentNullException(nameof(gxproc), "GeneXus procedure parameter cannot be null");
 
-				string fileName = $"a{gxproc}.dll";
-				string baseDir = !string.IsNullOrEmpty(AppDomain.CurrentDomain.RelativeSearchPath) ? AppDomain.CurrentDomain.RelativeSearchPath : AppDomain.CurrentDomain.BaseDirectory;
-				string fullPath = Path.Combine(baseDir, fileName);
+				string fullPath = gxproc;
+				if (!Path.IsPathRooted(gxproc))
+				{
+					string fileName = $"a{gxproc}.dll";
+					string baseDir = !string.IsNullOrEmpty(AppDomain.CurrentDomain.RelativeSearchPath) ? AppDomain.CurrentDomain.RelativeSearchPath : AppDomain.CurrentDomain.BaseDirectory;
+					fullPath = Path.Combine(baseDir, fileName);
+				}
+
 				if (!File.Exists(fullPath))
-					throw new FileNotFoundException($"File not found at {fullPath}", fileName);
+					throw new FileNotFoundException($"File not found at {fullPath}", fullPath);
 
 				MqttClient mqtt = GetClient(key);
 
@@ -229,46 +295,11 @@ namespace MQTTLib
 					UserProperties = new List<MqttUserProperty> { new MqttUserProperty("gxrocedure", $"{{\"gxrocedure\":\"{gxproc}\"}}") }
 				};
 
-				mqtt.m_mqttClient.UseApplicationMessageReceivedHandler(msg =>
-				{
-					if (msg == null || msg.ApplicationMessage == null || msg.ApplicationMessage.Payload == null)
-						return;
-#if DEBUG
-					Console.WriteLine("");
-					Console.WriteLine($"Message arrived! Topic:{msg.ApplicationMessage.Topic} Payload:{Encoding.UTF8.GetString(msg.ApplicationMessage.Payload)}");
-					Console.WriteLine("");
-#endif
-					try
-					{
-						Assembly asm = Assembly.LoadFrom(fullPath);
-						Type procType = asm.GetTypes().FirstOrDefault(t => t.FullName.EndsWith(gxproc, StringComparison.InvariantCultureIgnoreCase));
-
-						if (procType == null)
-							throw new InvalidDataException("Data type not found");
-
-						var methodInfo = procType.GetMethod("execute", new Type[] { typeof(string), typeof(string) });
-						if (methodInfo == null)
-							throw new NotImplementedException("Method 'execute' not found");
-
-						var obj = Activator.CreateInstance(procType);
-						methodInfo.Invoke(obj, new object[] { msg.ApplicationMessage.Topic, Encoding.UTF8.GetString(msg.ApplicationMessage.Payload) });
-					}
-					catch (Exception ex)
-					{
-						Console.WriteLine($"Error executing the procedure at '{fullPath}'");
-						Console.WriteLine(ex.Message);
-						Exception inner = ex.InnerException;
-						while (inner != null)
-						{
-							Console.WriteLine(inner.Message);
-							inner = inner.InnerException;
-						}
-					}
-
-				});
+				if (mqtt.m_mqttClient.ApplicationMessageReceivedHandler == null)
+					mqtt.m_mqttClient.UseApplicationMessageReceivedHandler(mqtt.ProcessMessage);
 
 				MqttClientSubscribeResult result = mqtt.m_mqttClient.SubscribeAsync(options).GetAwaiter().GetResult();
-				s_topicProcs[GetProcKey(mqtt, topic)] = gxproc;
+				mqtt.AddTopic(topic, fullPath);// GetClient s_topicProcs[GetProcKey(mqtt, topic)] = gxproc;
 
 			}
 			catch (Exception ex)
@@ -285,9 +316,7 @@ namespace MQTTLib
 			{
 				MqttClient mqtt = GetClient(key);
 				mqtt.m_mqttClient.UnsubscribeAsync(topic).GetAwaiter().GetResult();
-				string procKey = GetProcKey(mqtt, topic);
-				if (s_topicProcs.ContainsKey(procKey))
-					s_topicProcs.Remove(procKey);
+				mqtt.RemoveTopic(topic);
 			}
 			catch (Exception ex)
 			{
@@ -345,7 +374,5 @@ namespace MQTTLib
 
 			return Connections[key];
 		}
-
-		static string GetProcKey(MqttClient client, string topic) => $"{client.m_mqttClient.Options.ClientId}:{topic}";
 	}
 }
