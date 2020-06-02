@@ -84,12 +84,12 @@ namespace MQTTLib
 				if (procType == null)
 					throw new InvalidDataException("Data type not found");
 
-				var methodInfo = procType.GetMethod("execute", new Type[] { typeof(string), typeof(string) });
+				var methodInfo = procType.GetMethod("execute", new Type[] { typeof(string), typeof(string) , typeof(DateTime)});
 				if (methodInfo == null)
 					throw new NotImplementedException("Method 'execute' not found");
 
 				var obj = Activator.CreateInstance(procType);
-				methodInfo.Invoke(obj, new object[] { msg.ApplicationMessage.Topic, Encoding.UTF8.GetString(msg.ApplicationMessage.Payload) });
+				methodInfo.Invoke(obj, new object[] { msg.ApplicationMessage.Topic, Encoding.UTF8.GetString(msg.ApplicationMessage.Payload), DateTime.Now });
 			}
 			catch (Exception ex)
 			{
