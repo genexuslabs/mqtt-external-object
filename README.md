@@ -10,7 +10,7 @@ This repository holds the implementation of a GeneXus [External Object](https://
 
 First import the [MQTT_EXO.xpz](./xpz/MQTT_EXO.xpz) provided in this repository. This will import 3 different External Objects and a Domain.
 
-You also need to include to the Knowledge Base the files provided in the [latest release](https://github.com/genexuslabs/mqtt-external-object/releases) of this repository. Unzip the [MQTTLib.zip](https://github.com/genexuslabs/mqtt-external-object/releases/latest/download/MQTTLib.zip) file and add the three contained files (BouncyCastle.Crypto.dll, MQTTLib.dll and MQTTnet.dll ) into your Knowledge Base. Make sure you set the property [Extract for .Net Generator](https://wiki.genexus.com/commwiki/servlet/wiki?39501) to **True** for all of these files.
+You also need to include to the Knowledge Base the files provided in the [latest release](https://github.com/genexuslabs/mqtt-external-object/releases) of this repository. Unzip the [MQTTLib.zip](https://github.com/genexuslabs/mqtt-external-object/releases/latest/download/MQTTLib.zip) file and add the three contained files (BouncyCastle.Crypto.dll, MQTTLib.dll, and MQTTnet.dll ) into your Knowledge Base. Make sure you set the property [Extract for .Net Generator](https://wiki.genexus.com/commwiki/servlet/wiki?39501) to **True** for all of these files.
 
 The MQTT External Object is the one that holds the method for publishing and subscribing to MQTT events. 
 
@@ -18,7 +18,7 @@ The MQTT External Object is the one that holds the method for publishing and sub
 
 The implementation is based on [MQTTnet](https://github.com/chkr1011/MQTTnet), *"a high performance .NET library for MQTT based communication."* 
 
-### Connecting to a MQTT broker
+### Connecting to an MQTT broker
 
 The first thing you need to do, either for publishing or subscribing is to connect to the desired broker.
 
@@ -26,7 +26,7 @@ The first thing you need to do, either for publishing or subscribing is to conne
 &mqttStatus = MQTT.Connect(&url, &mqttConfig)
 ```
 
-Where `&url` is the url of the broker and `&mqttConfig` is an instance of the also provided `MqttConfig` External Object.  
+Where `&url` is the URL of the broker and `&mqttConfig` is an instance of the also provided `MqttConfig` External Object.  
 The `MqttConfig` External Object has the needed properties to connect to your broker, whether you're using user and password or a certificate. Here are the properties that hold a default value.
 
 Name|Default value
@@ -47,7 +47,7 @@ SessionExpiryInterval|0
 
 ### Publishing messages
 
-The publish method receives a GUID, which is the Key of the `MqttStatus` after connecting, a topic, the message itself, the [Quality of Service](https://assetwolf.com/learn/mqtt-qos-understanding-quality-of-service) (there's a domain called MqttQoS), a boolean indicating if the message should be retained and a numeric stating the expiricy of the message (in seconds)
+The publish method receives a GUID, which is the Key of the `MqttStatus` after connecting, a topic, the message itself, the [Quality of Service](https://assetwolf.com/learn/mqtt-qos-understanding-quality-of-service) (there's a domain called MqttQoS), a boolean indicating if the message should be retained and a numeric stating the expiry of the message (in seconds)
 
 ```genexus
 &mqttStatus = MQTT.Publish(&mqttguid,&topic, &message, MqttQoS.AtMostOnce, true,30)
@@ -63,15 +63,15 @@ To subscribe you need to call the Subscribe method which also receives the GUID 
 &mqttStatus = MQTT.Subscribe(&mqttguid,&topic,"SaveMessage",MqttQoS.AtLeastOnce)
 ```
 
-The GeneXus procedure to be called when a message arrives must comply the following requirements.
+The GeneXus procedure to be called when a message arrives must comply with the following requirements.
 1) Its [Main program property](https://wiki.genexus.com/commwiki/servlet/wiki?7407) must be set to **True**
-2) The parm rule must be exactly as follows. First a Varchar that will be the topic, the second parameter (also Varchar) will be the message body itself, and a third parameter (DateTime) that's the timestamp when the message was received by the client. This DateTime is generated on the subscriber.
+2) The parm rule must be exactly as follows. First, a Varchar that will be the topic, the second parameter (also Varchar) will be the message body itself, and a third parameter (DateTime) that's the timestamp when the message was received by the client. This DateTime is generated on the subscriber.
 
 ```genexus
 parm(in:&topic,in:&message,in:&dateTime);
 ```
 
-Once a message for the subscribed topic is received, the Procedure will be called asyncronously. You will not have a status back from the execution, unless you write the code yourself in your procedure.
+Once a message for the subscribed topic is received, the Procedure will be called asynchronously. You will not have a status back from the execution unless you write the code yourself in your procedure.
 
 ### Unsubscribing
 
@@ -89,7 +89,7 @@ To disconnect an established connection all you have to do is sending the connec
 &mqttStatus = MQTT.Disconnect(&mqttguid)
 ```
 
-There's also an `IsConnected` method that receives the GUID of the connection and a Boolean as an out parameter that will hold wether the connection is active or not.
+There's also an `IsConnected` method that receives the GUID of the connection and a Boolean as an out parameter that will hold whether the connection is active or not.
 
 ```genexus
 &mqttStatus = MQTT.IsConnected(&mqttguid,&connected)
