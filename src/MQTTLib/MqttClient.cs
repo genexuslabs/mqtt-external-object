@@ -6,6 +6,7 @@ using System.Reflection;
 using System.Runtime.Serialization.Json;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using MQTTnet;
 using MQTTnet.Client;
@@ -62,6 +63,28 @@ namespace MQTTLib
 			return null;
 		}
 
+		IEnumerable<string> GetMatchTopicProcs(string topic)
+		{
+			foreach (string key in s_topicProcs.Keys)
+			{
+				string regexPattern = key;
+				if (key.EndsWith("#"))
+				{
+					regexPattern = regexPattern.Replace("#", ".*");
+				}
+				if (key.Contains("+"))
+				{
+					regexPattern = regexPattern.Replace("+", "[a-zA-Z0-9]*");
+				}
+
+				Regex regex = new Regex(regexPattern);
+				if (regex.IsMatch(topic))
+					yield return s_topicProcs[key];
+			}
+
+			yield break;
+		}
+
 		public void ProcessMessage(MqttApplicationMessageReceivedEventArgs msg)
 		{
 			if (msg == null || msg.ApplicationMessage == null || msg.ApplicationMessage.Payload == null)
@@ -72,34 +95,36 @@ namespace MQTTLib
 			Console.WriteLine("");
 #endif
 
-			string fullPath = GetProc(msg.ApplicationMessage.Topic);
-			try
+			foreach (string fullPath in GetMatchTopicProcs(msg.ApplicationMessage.Topic))
 			{
-				FileInfo info = new FileInfo(fullPath);
-				string className = info.Name.Substring(1).Replace(info.Extension, string.Empty); //it's a main. There's a stub (a) 
-
-				Assembly asm = Assembly.LoadFrom(fullPath);
-				Type procType = asm.GetTypes().FirstOrDefault(t => t.FullName.EndsWith(className, StringComparison.InvariantCultureIgnoreCase));
-
-				if (procType == null)
-					throw new InvalidDataException("Data type not found");
-
-				var methodInfo = procType.GetMethod("execute", new Type[] { typeof(string), typeof(string) , typeof(DateTime)});
-				if (methodInfo == null)
-					throw new NotImplementedException("Method 'execute' not found");
-
-				var obj = Activator.CreateInstance(procType);
-				methodInfo.Invoke(obj, new object[] { msg.ApplicationMessage.Topic, Encoding.UTF8.GetString(msg.ApplicationMessage.Payload), DateTime.Now });
-			}
-			catch (Exception ex)
-			{
-				Console.WriteLine($"Error executing the procedure at '{fullPath}'");
-				Console.WriteLine(ex.Message);
-				Exception inner = ex.InnerException;
-				while (inner != null)
+				try
 				{
-					Console.WriteLine(inner.Message);
-					inner = inner.InnerException;
+					FileInfo info = new FileInfo(fullPath);
+					string className = info.Name.Substring(1).Replace(info.Extension, string.Empty); //it's a main. There's a stub (a) 
+
+					Assembly asm = Assembly.LoadFrom(fullPath);
+					Type procType = asm.GetTypes().FirstOrDefault(t => t.FullName.EndsWith(className, StringComparison.InvariantCultureIgnoreCase));
+
+					if (procType == null)
+						throw new InvalidDataException("Data type not found");
+
+					var methodInfo = procType.GetMethod("execute", new Type[] { typeof(string), typeof(string), typeof(DateTime) });
+					if (methodInfo == null)
+						throw new NotImplementedException("Method 'execute' not found");
+
+					var obj = Activator.CreateInstance(procType);
+					methodInfo.Invoke(obj, new object[] { msg.ApplicationMessage.Topic, Encoding.UTF8.GetString(msg.ApplicationMessage.Payload), DateTime.Now });
+				}
+				catch (Exception ex)
+				{
+					Console.WriteLine($"Error executing the procedure at '{fullPath}'");
+					Console.WriteLine(ex.Message);
+					Exception inner = ex.InnerException;
+					while (inner != null)
+					{
+						Console.WriteLine(inner.Message);
+						inner = inner.InnerException;
+					}
 				}
 			}
 		}
