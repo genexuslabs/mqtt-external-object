@@ -39,11 +39,11 @@ jobs:
     - name: Set the version environment variable
       run: |
         $file = ".\src\MQTTLib\bin\${env:Configuration}\${env:Bin}"
-        $env:WINS_VERSION = $(Get-Item $file).VersionInfo.ProductVersion
-        Write-Host WINS_VERSION $env:WINS_VERSION
+        $WINS_VERSION = $(Get-Item $file).VersionInfo.ProductVersion
+        Write-Host WINS_VERSION $WINS_VERSION
         echo "WINS_VERSION=$WINS_VERSION" >> $env:GITHUB_ENV
-        $env:TIMESTAMP = Get-Date -Format "yyyyMMddHHmmss"
-        Write-Host TIMESTAMP $env:TIMESTAMP
+        $TIMESTAMP = Get-Date -Format "yyyyMMddHHmmss"
+        Write-Host TIMESTAMP $TIMESTAMP
         echo "TIMESTAMP=$TIMESTAMP" >> $env:GITHUB_ENV
     - name: Deploy & zip
       run: |
