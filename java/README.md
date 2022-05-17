@@ -1,4 +1,4 @@
-# MQTT External Object  
+# MQTT External Object 
 
 This repository holds the implementation of a GeneXus [External Object](https://wiki.genexus.com/commwiki/servlet/wiki?6148) that allows you to include MQTT events in your Knowledge Base.
 
@@ -6,11 +6,11 @@ This repository holds the implementation of a GeneXus [External Object](https://
 
 ## How to use it
 
-First, add to the Knowledge Base the dependencies needed for the external object, provided in the [assets](./assets/) folder of this repository. Unzip the [MQTTLib.zip](./assets/MQTTLib.zip) file and add the two contained files (`genexus-mqtt-*.jar`, `eclipse-paho-mqttv3-1.2.5.jar`) into your Knowledge Base. Make sure you set the property [Extract for Java Generator](https://wiki.genexus.com/commwiki/servlet/wiki?39499,Extract+for+Java+Generator+property) to **True** for all of these files.
+First, add to the Knowledge Base the dependencies needed for the external object. Add `genexus-mqtt-*.jar` present in the Java Release and `eclipse-paho-mqttv3-1.2.5.jar` from maven into your Knowledge Base. Make sure you set the property [Extract for Java Generator](https://wiki.genexus.com/commwiki/servlet/wiki?39499,Extract+for+Java+Generator+property) to **True** for all of these files.
 
 In order to be able to import the external object, you need to add both jar files to your [classpath property](https://wiki.genexus.com/commwiki/servlet/wiki?9248,Classpath+property,). 
 
-You also need to import the [MQTT_EXO.xpz](./assets/MQTT_EXO.xpz) file provided in this repository. This will import 3 different External Objects and a Domain.
+You also need to import MQTT_EXO.xpz file provided in Java Release. This will import 3 different External Objects and a Domain.
 
 The MQTT External Object is the one holds the method for publishing and subscribing to MQTT events. 
 
