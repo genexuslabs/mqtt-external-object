@@ -4,13 +4,13 @@
 
 This repository holds the implementation of a GeneXus [External Object](https://wiki.genexus.com/commwiki/servlet/wiki?6148) that allows you to include MQTT events in your Knowledge Base.
 
-=== As of August 2020, the implementation is only available for the .NET (C#) generator ===
+=== As of August 2020, the implementation is only available for the .NET Framework generator ===
 
 ## How to use it
 
 First import the [MQTT_EXO.xpz](https://github.com/genexuslabs/mqtt-external-object/releases) provided in this repository. This will import 3 different External Objects and a Domain.
 
-You also need to include to the Knowledge Base the files provided in the [latest release](https://github.com/genexuslabs/mqtt-external-object/releases) of this repository. Unzip the MQTTLib.zip file and add the three contained files (BouncyCastle.Crypto.dll, MQTTLib.dll, and MQTTnet.dll ) into your Knowledge Base. Make sure you set the property [Extract for .Net Generator](https://wiki.genexus.com/commwiki/servlet/wiki?39501) to **True** for all of these files.
+You also need to include to the Knowledge Base the files provided in the [latest release](https://github.com/genexuslabs/mqtt-external-object/releases) of this repository. Unzip the MQTTLib.zip file and add the three contained files (BouncyCastle.Crypto.dll, MQTTLib.dll, and MQTTnet.dll ) into your Knowledge Base. Make sure you set the property [Extract for .Net Framework Generator](https://wiki.genexus.com/commwiki/servlet/wiki?39501) to **True** and [.Net Framework Extraction Directory](https://wiki.genexus.com/commwiki/servlet/wiki?39502) to *.\bin* for all of these files. 
 
 The MQTT External Object is the one that holds the method for publishing and subscribing to MQTT events. 
 
