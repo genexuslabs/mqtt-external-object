@@ -64,8 +64,14 @@ To subscribe you need to call the Subscribe method which also receives the GUID 
 ```
 
 The GeneXus procedure to be called when a message arrives must comply with the following requirements.
-1) Its [Main program property](https://wiki.genexus.com/commwiki/servlet/wiki?7407) must be set to **True**
+1) Its [Main program property](https://wiki.genexus.com/commwiki/servlet/wiki?7407) must be set to **True** and [Call Protocol](https://wiki.genexus.com/commwiki/servlet/wiki?7947,Call+protocol+property) must be set to **Internal**.
 2) The parm rule must be exactly as follows. First, a Varchar that will be the topic, the second parameter (also Varchar) will be the message body itself, and a third parameter (DateTime) that's the timestamp when the message was received by the client. This DateTime is generated on the subscriber.
+
+It is also possible to provide the complete path of an executable in the following way:
+
+```genexus
+&mqttStatus = MQTT.Subscribe(&mqttguid,&topic,"C:\Models\MQTTModel\NETFramework\Web\bin\asavemessage.exe",MqttQoS.AtLeastOnce)
+```
 
 ```genexus
 parm(in:&topic,in:&message,in:&dateTime);
